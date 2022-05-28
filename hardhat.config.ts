@@ -12,21 +12,12 @@ import { HardhatUserConfig, task } from "hardhat/config";
 import { HDAccountsUserConfig } from "hardhat/types";
 import "solidity-coverage";
 
-// task("test", "Test the contracts", async () => {});
+
 const accounts: HDAccountsUserConfig = {
   mnemonic:
     process.env.MNEMONIC ||
     "test test test test test test test test test test test junk",
 };
-
-// , async (args, hre, runSuper) => {
-//   const launch = <NodeLaunch>await hre.ethers.getContract("NodeLaunch");
-//   await launch.setBaseURI(
-//     "https://raw.githubusercontent.com/Node-Fi/NodeLaunch/main/metadata/"
-//   );
-// });
-
-// const accounts = [`0x${process.env.PRIVATE_KEY_DEV}`];
 
 /**
  * @type import('hardhat/config').HardhatUserConfig
