@@ -8,13 +8,22 @@ import "../../src/minima_contracts/swappa/PairYearn.sol";
 
 import "forge-std/console.sol";
 
-contract PairYearnTest is Test {
+import {ExtendedDSTest} from "../utils/ExtendedDSTest.sol";
+
+/*
+    Dependency: Yearn protocol
+    chain: Ethereum
+*/
+contract PairYearnTest is ExtendedDSTest {
 
     PairYearn public pairYearn = new PairYearn(); 
     address constant private yDAIVaultAddress = 0xACd43E627e64355f1861cEC6d3a6688B31a6F952;
     address constant private DaiAddress = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
     address constant private DaiWhaleAddress = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
     address constant private yDaiAddress = 0xACd43E627e64355f1861cEC6d3a6688B31a6F952;
+
+    // Used for integer approximation
+    uint256 public constant DELTA = 10**5;
 
     function setUp() public {
         // Get Dai for test contract
@@ -23,7 +32,7 @@ contract PairYearnTest is Test {
         dai.transfer(address(pairYearn), 1e18);
 
         uint inputAmount = dai.balanceOf(address(pairYearn));
-        console.log("Dai balance", inputAmount);
+        console.log("Dai balance of pairYearn", inputAmount);
     }
 
 
@@ -38,13 +47,17 @@ contract PairYearnTest is Test {
         
         pairYearn.swap( DaiAddress, yDaiAddress, address(this),data);
 
-        console.log("aToken balance", ERC20(yDaiAddress).balanceOf(address(this)));
+
+        uint256 aTokenBalance = ERC20(yDaiAddress).balanceOf(address(this));
+        console.log("aToken balance", aTokenBalance);
         console.log("aToken name", ERC20(yDaiAddress).name());
+
+         assertRelApproxEq(aTokenBalance, 865784266049519476, DELTA);
       
     }
 
     // Withdraw
-    function Swap1Withdraw() public {
+    function testswap1Withdraw() public {
 
         // Deposit 
         console.log("\n Deposit ...");
@@ -66,23 +79,26 @@ contract PairYearnTest is Test {
         
         pairYearn.swap(yDaiAddress, DaiAddress, address(this),data);
 
-        console.log("Dai balance", ERC20(DaiAddress).balanceOf(address(this)));
-        
+        uint256 daiBalance = ERC20(DaiAddress).balanceOf(address(this));
+        console.log("Dai balance", daiBalance);
+        assertEq(daiBalance, 999999999999999999);
     }
 
-    function testGetOutputAmount() public view {
+    function testGetOutputAmount() public {
         uint8 inputType = 2;
 
         bytes memory data = abi.encodePacked(address(yDAIVaultAddress), uint8(inputType));
         uint amountIn = 1e18;
         uint256 outputAmount = pairYearn.getOutputAmount( DaiAddress, yDaiAddress,amountIn, data);
         console.log("Dait to Atoken: ",outputAmount );
+        assertRelApproxEq(outputAmount, 865784266049519476, DELTA);
 
         /// Widthdraw amount
         inputType = 1;
         data = abi.encodePacked(address(yDAIVaultAddress), uint8(inputType));
         uint256 outputAmountDai = pairYearn.getOutputAmount( yDaiAddress, DaiAddress, outputAmount, data);
         console.log("Atoken to Dai: ", outputAmountDai );
+        assertRelApproxEq(outputAmountDai, 999999999999999999, DELTA);
 
     }
 
