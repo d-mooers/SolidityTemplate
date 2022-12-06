@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.12;
+pragma solidity 0.6.8;
 
 interface IYearnVault {
     function token() external view returns (address);
@@ -25,4 +25,6 @@ interface IYearnVault {
     function withdraw(uint256) external;
 
     function withdrawAll() external;
+
+    function balance() external view returns (uint256);
 }

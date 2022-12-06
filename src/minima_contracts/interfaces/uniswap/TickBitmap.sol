@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity >=0.5.0;
+pragma solidity 0.6.8;
 
 import './BitMath.sol';
 import './IUniswapV3PoolState.sol';
