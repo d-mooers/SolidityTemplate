@@ -1,9 +1,29 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity 0.6.8;
 
-import {Test} from "forge-std/Test.sol";
+import "ds-test/test.sol";
+import {console} from "forge-std/console.sol";
+import {stdStorage, StdStorage, Test} from "forge-std/Test.sol";
+import {Vm} from "forge-std/Vm.sol";
+
+import {Utils} from "./Utilities.sol";
 
 contract ExtendedDSTest is Test {
+    Utils internal utils;
+    address payable[] internal users;
+
+    address internal alice;
+    address internal bob;
+
+    function setUp() public virtual {
+        utils = new Utils();
+        users = utils.createUsers(5);
+        alice = users[0];
+        vm.label(alice, "Alice");
+        bob = users[1];
+        vm.label(bob, "Bob");
+    }
+
     // solhint-disable-next-line
     function assertNeq(address a, address b) internal {
         if (a == b) {
