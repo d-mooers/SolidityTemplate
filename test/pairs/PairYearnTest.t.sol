@@ -4,7 +4,7 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 import {Test} from "forge-std/Test.sol";
 
-import "../../src/swappa/PairYearn.sol";
+import "../../src/pairs/PairYearn.sol";
 
 import "forge-std/console.sol";
 

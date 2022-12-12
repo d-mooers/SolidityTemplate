@@ -1,6 +1,6 @@
 pragma solidity 0.6.8;
 
-import {ISwappaPairV1} from "../../src/swappa/ISwappaPairV1.sol";
+import {ISwappaPairV1} from "../../src/interfaces/ISwappaPairV1.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 /**

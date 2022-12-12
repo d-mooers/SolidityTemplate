@@ -5,7 +5,7 @@ import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 import {Test} from "forge-std/Test.sol";
 
-import {MinimaRouterV1} from "../../src/swappa/MinimaRouterV1.sol";
+import {MinimaRouterV1} from "../../src/MinimaRouterV1.sol";
 import {MockPair} from "../mock/MockPair.sol";
 
 import "forge-std/console.sol";

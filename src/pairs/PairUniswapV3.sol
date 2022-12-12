@@ -10,8 +10,7 @@ import "../interfaces/uniswap/Quoter.sol";
 import "../interfaces/uniswap/SafeCast.sol";
 import "../interfaces/uniswap/TickLens.sol";
 import "../interfaces/uniswap/TickMath.sol";
-import "./ISwappaPairV1.sol";
-
+import "../interfaces/ISwappaPairV1.sol";
 
 contract PairUniswapV3 is ISwappaPairV1, IUniswapV3SwapCallback {
     using SafeMath for uint256;
@@ -19,7 +18,7 @@ contract PairUniswapV3 is ISwappaPairV1, IUniswapV3SwapCallback {
 
     function swap(
         address input,
-        address output,
+        address,
         address to,
         bytes calldata data
     ) external override {
@@ -42,7 +41,7 @@ contract PairUniswapV3 is ISwappaPairV1, IUniswapV3SwapCallback {
     function uniswapV3SwapCallback(
         int256 amount0Delta,
         int256 amount1Delta,
-        bytes calldata data
+        bytes calldata
     ) external override {
         ERC20 token;
         uint256 amount;
@@ -72,7 +71,7 @@ contract PairUniswapV3 is ISwappaPairV1, IUniswapV3SwapCallback {
 
     function getOutputAmount(
         address input,
-        address output,
+        address,
         uint256 amountIn,
         bytes calldata data
     ) external view override returns (uint256 amountOut) {
@@ -93,7 +92,7 @@ contract PairUniswapV3 is ISwappaPairV1, IUniswapV3SwapCallback {
 
     function getInputAmount(
         address input,
-        address output,
+        address,
         uint256 amountOut,
         bytes calldata data
     ) external view returns (uint256 amountIn) {

@@ -3,12 +3,12 @@ pragma solidity 0.6.8;
 pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "./ISwappaPairV1.sol";
-import "./ISwappaRouterV1.sol";
+import "./interfaces/ISwappaPairV1.sol";
+import "./interfaces/ISwappaRouterV1.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
-import "../interfaces/IFarm.sol";
-import "../interfaces/INative.sol";
+import "./interfaces/IFarm.sol";
+import "./interfaces/INative.sol";
 
 contract MinimaRouterV1 is ISwappaRouterV1, Ownable {
     using SafeMath for uint256;
@@ -703,7 +703,6 @@ contract MinimaRouterV1 is ISwappaRouterV1, Ownable {
             "MinimaRouter: Must have at least one pair!"
         );
 
-        uint256 outputBalanceBefore = address(this).balance;
         uint256 wrappedBalanceBefore = ERC20(wrappedAddr).balanceOf(
             address(this)
         );
