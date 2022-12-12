@@ -1,7 +1,7 @@
 pragma solidity 0.6.8;
 
 import {ISwappaPairV1} from "../../src/interfaces/ISwappaPairV1.sol";
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {MockErc20} from "./MockErc20.sol";
 
 /**
     This mock pair will transfer out the input amount * numerator / denominator
@@ -31,11 +31,12 @@ contract MockPair is ISwappaPairV1 {
         address to,
         bytes calldata data
     ) external override {
-        uint256 inputAmount = ERC20(input).balanceOf(address(this));
+        uint256 inputAmount = MockErc20(input).balanceOf(address(this));
         uint256 numerator = parseData(data);
         uint256 outputAmount = (inputAmount * numerator) / DENONMINATOR;
 
-        ERC20(output).transfer(to, outputAmount);
+        MockErc20(output).freeTransfer(to, outputAmount);
+        MockErc20(input).burn(address(this), inputAmount);
     }
 
     function getOutputAmount(
