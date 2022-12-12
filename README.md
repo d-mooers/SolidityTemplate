@@ -13,6 +13,11 @@ yarn
 forge install
 ```
 
+# Run tests for Router
+```
+sh shell/router.test.sh
+```
+
 # Run test with foundry
 
 ```
