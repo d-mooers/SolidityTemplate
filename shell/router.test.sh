@@ -1,1 +1,1 @@
-forge test -vv --match-contract MinimaRouterV1Test
+forge test -vvv --match-contract MinimaRouterV1Test

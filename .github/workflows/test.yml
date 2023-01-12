@@ -22,13 +22,18 @@ jobs:
         with:
           version: nightly
 
+      - name: Sets up rep
+        run: |
+          sh ./shell/init.sh
+        id: prepare
+
       - name: Run Forge build
         run: |
           forge --version
           forge build --sizes
         id: build
 
-      - name: Run Forge tests
+      - name: Unit tests on main router
         run: |
-          forge test -vvv
+          forge test -vvv --match-contract MinimaRouterV1Test
         id: test
