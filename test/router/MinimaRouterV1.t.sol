@@ -7,7 +7,7 @@ import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {Test} from "forge-std/Test.sol";
 
 import {MinimaRouterV1} from "../../src/MinimaRouterV1.sol";
-import {ISwappaRouterV1} from "../../src/interfaces/ISwappaRouterV1.sol";
+import {IMinimaRouterV1} from "../../src/interfaces/IMinimaRouterV1.sol";
 import {MockPair} from "../mock/MockPair.sol";
 
 import "forge-std/console.sol";
@@ -84,9 +84,14 @@ contract MinimaRouterV1Test is ExtendedDSTest {
             return;
         }
 
-        address[] memory path = new address[](tradeLen);
-        address[] memory pairs = new address[](tradeLen - 1);
-        bytes[] memory extras = new bytes[](tradeLen - 1);
+        address[][] memory path = new address[][](1);
+        address[][] memory pairs = new address[][](1);
+        bytes[][] memory extras = new bytes[][](1);
+
+        uint256[] memory inputAmounts = new uint256[](1); //new uint256[](1);
+
+        IMinimaRouterV1.Divisor[][]
+            memory divisors = new IMinimaRouterV1.Divisor[][](0);
 
         MockErc20 outputToken = tokens[tradeLen - 1];
         MockErc20 inputToken = tokens[0];
@@ -96,22 +101,26 @@ contract MinimaRouterV1Test is ExtendedDSTest {
         if (inputBalanceBefore < inputAmount) {
             return;
         }
-
+        path[0] = new address[](tradeLen);
+        pairs[0] = new address[](tradeLen - 1);
+        extras[0] = new bytes[](tradeLen - 1);
+        inputAmounts[0] = inputAmount;
         for (uint8 i = 0; i < tradeLen; i++) {
-            path[i] = address(tokens[i]);
+            path[0][i] = address(tokens[i]);
 
             if (i > 0) {
-                pairs[i - 1] = address(pair);
-                extras[i - 1] = new bytes(0);
+                pairs[0][i - 1] = address(pair);
+                extras[0][i - 1] = new bytes(0);
             }
         }
 
-        ISwappaRouterV1.SwapPayload memory payload = ISwappaRouterV1
-            .SwapPayload({
+        IMinimaRouterV1.MultiSwapPayload memory payload = IMinimaRouterV1
+            .MultiSwapPayload({
                 path: path,
                 pairs: pairs,
                 extras: extras,
-                inputAmount: inputAmount,
+                divisors: divisors,
+                inputAmounts: inputAmounts,
                 minOutputAmount: inputAmount,
                 expectedOutputAmount: inputAmount,
                 to: alice,
@@ -138,6 +147,259 @@ contract MinimaRouterV1Test is ExtendedDSTest {
         );
     }
 
+    function testRouteSuccessfulSplit(uint8 tradeLen, uint256 inputAmount)
+        public
+        asUser(alice)
+    {
+        if (tradeLen < 4 || inputAmount == 0) {
+            return;
+        }
+
+        address[][] memory path = new address[][](2);
+        address[][] memory pairs = new address[][](2);
+        bytes[][] memory extras = new bytes[][](2);
+
+        uint256[] memory inputAmounts = new uint256[](2); //new uint256[](1);
+
+        IMinimaRouterV1.Divisor[][]
+            memory divisors = new IMinimaRouterV1.Divisor[][](1);
+
+        MockErc20 outputToken = tokens[tradeLen - 1];
+        MockErc20 inputToken = tokens[0];
+        uint256 outputBalanceBefore = outputToken.balanceOf(alice);
+        uint256 inputBalanceBefore = inputToken.balanceOf(alice);
+
+        if (inputBalanceBefore < inputAmount) {
+            return;
+        }
+        path[0] = new address[]((tradeLen / 2) + 1);
+        pairs[0] = new address[](tradeLen / 2);
+        extras[0] = new bytes[](tradeLen / 2);
+        inputAmounts[0] = inputAmount;
+        for (uint8 i = 0; i <= tradeLen / 2; i++) {
+            path[0][i] = address(tokens[i]);
+
+            if (i > 0) {
+                pairs[0][i - 1] = address(pair);
+                extras[0][i - 1] = new bytes(0);
+            }
+        }
+        divisors[0] = new IMinimaRouterV1.Divisor[](1);
+        divisors[0][0] = IMinimaRouterV1.Divisor({
+            toIdx: 1,
+            divisor: 100,
+            token: address(tokens[tradeLen / 2])
+        });
+
+        path[1] = new address[](tradeLen - tradeLen / 2);
+        pairs[1] = new address[]((tradeLen - tradeLen / 2) - 1);
+        extras[1] = new bytes[]((tradeLen - tradeLen / 2) - 1);
+        for (uint8 i = 0; i < tradeLen - tradeLen / 2; i++) {
+            path[1][i] = address(tokens[i + tradeLen / 2]);
+
+            if (i > 0) {
+                pairs[1][i - 1] = address(pair);
+                extras[1][i - 1] = new bytes(0);
+            }
+        }
+
+        IMinimaRouterV1.MultiSwapPayload memory payload = IMinimaRouterV1
+            .MultiSwapPayload({
+                path: path,
+                pairs: pairs,
+                extras: extras,
+                divisors: divisors,
+                inputAmounts: inputAmounts,
+                minOutputAmount: inputAmount,
+                expectedOutputAmount: inputAmount,
+                to: alice,
+                deadline: block.timestamp + 10,
+                partner: 0,
+                sig: new bytes(0)
+            });
+
+        inputToken.approve(address(minimaRouter), inputAmount);
+        minimaRouter.swapExactInputForOutput(payload);
+
+        uint256 outputBalanceAfter = outputToken.balanceOf(alice);
+        uint256 inputBalanceAfter = inputToken.balanceOf(alice);
+
+        assertEq(
+            outputBalanceAfter,
+            outputBalanceBefore + inputAmount,
+            "Insufficent output"
+        );
+        assertEq(
+            inputBalanceAfter,
+            inputBalanceBefore - inputAmount,
+            "Not enough input taken"
+        );
+    }
+
+    function testRouteFailsWhenDivisorTooHigh(
+        uint8 tradeLen,
+        uint256 inputAmount
+    ) public asUser(alice) {
+        if (tradeLen < 4 || inputAmount == 0) {
+            return;
+        }
+
+        address[][] memory path = new address[][](2);
+        address[][] memory pairs = new address[][](2);
+        bytes[][] memory extras = new bytes[][](2);
+
+        uint256[] memory inputAmounts = new uint256[](2); //new uint256[](1);
+
+        IMinimaRouterV1.Divisor[][]
+            memory divisors = new IMinimaRouterV1.Divisor[][](1);
+
+        MockErc20 outputToken = tokens[tradeLen - 1];
+        MockErc20 inputToken = tokens[0];
+        uint256 inputBalanceBefore = inputToken.balanceOf(alice);
+
+        if (inputBalanceBefore < inputAmount) {
+            return;
+        }
+        path[0] = new address[]((tradeLen / 2) + 1);
+        pairs[0] = new address[](tradeLen / 2);
+        extras[0] = new bytes[](tradeLen / 2);
+        inputAmounts[0] = inputAmount;
+        for (uint8 i = 0; i <= tradeLen / 2; i++) {
+            path[0][i] = address(tokens[i]);
+
+            if (i > 0) {
+                pairs[0][i - 1] = address(pair);
+                extras[0][i - 1] = new bytes(0);
+            }
+        }
+        divisors[0] = new IMinimaRouterV1.Divisor[](1);
+        divisors[0][0] = IMinimaRouterV1.Divisor({
+            toIdx: 1,
+            divisor: 101,
+            token: address(tokens[tradeLen / 2])
+        });
+
+        path[1] = new address[](tradeLen - tradeLen / 2);
+        pairs[1] = new address[]((tradeLen - tradeLen / 2) - 1);
+        extras[1] = new bytes[]((tradeLen - tradeLen / 2) - 1);
+        for (uint8 i = 0; i < tradeLen - tradeLen / 2; i++) {
+            path[1][i] = address(tokens[i + tradeLen / 2]);
+
+            if (i > 0) {
+                pairs[1][i - 1] = address(pair);
+                extras[1][i - 1] = new bytes(0);
+            }
+        }
+
+        IMinimaRouterV1.MultiSwapPayload memory payload = IMinimaRouterV1
+            .MultiSwapPayload({
+                path: path,
+                pairs: pairs,
+                extras: extras,
+                divisors: divisors,
+                inputAmounts: inputAmounts,
+                minOutputAmount: inputAmount,
+                expectedOutputAmount: inputAmount,
+                to: alice,
+                deadline: block.timestamp + 10,
+                partner: 0,
+                sig: new bytes(0)
+            });
+
+        inputToken.approve(address(minimaRouter), inputAmount);
+        vm.expectRevert(bytes("MinimaRouter: Divisor too high"));
+        minimaRouter.swapExactInputForOutput(payload);
+    }
+
+    function testRouteHandlesDivisor(
+        uint8 tradeLen,
+        uint256 inputAmount,
+        uint8 divisor
+    ) public asUser(alice) {
+        divisor = divisor % 100;
+        if (tradeLen < 4 || inputAmount == 0 || divisor == 0) {
+            return;
+        }
+
+        IMinimaRouterV1.MultiSwapPayload memory payload = IMinimaRouterV1
+            .MultiSwapPayload({
+                path: new address[][](2),
+                pairs: new address[][](2),
+                extras: new bytes[][](2),
+                divisors: new IMinimaRouterV1.Divisor[][](1),
+                inputAmounts: new uint256[](2),
+                minOutputAmount: 0,
+                expectedOutputAmount: inputAmount,
+                to: alice,
+                deadline: block.timestamp + 10,
+                partner: 0,
+                sig: new bytes(0)
+            });
+        MockErc20 outputToken;
+        MockErc20 inputToken;
+        uint256 outputBalanceBefore;
+        uint256 inputBalanceBefore;
+
+        {
+            outputToken = tokens[tradeLen - 1];
+            inputToken = tokens[0];
+            outputBalanceBefore = outputToken.balanceOf(alice);
+            inputBalanceBefore = inputToken.balanceOf(alice);
+
+            if (inputBalanceBefore < inputAmount) {
+                return;
+            }
+            payload.path[0] = new address[]((tradeLen / 2) + 1);
+            payload.pairs[0] = new address[](tradeLen / 2);
+            payload.extras[0] = new bytes[](tradeLen / 2);
+
+            for (uint8 i = 0; i <= tradeLen / 2; i++) {
+                payload.path[0][i] = address(tokens[i]);
+
+                if (i > 0) {
+                    payload.pairs[0][i - 1] = address(pair);
+                    payload.extras[0][i - 1] = new bytes(0);
+                }
+            }
+            payload.divisors[0] = new IMinimaRouterV1.Divisor[](1);
+            payload.divisors[0][0] = IMinimaRouterV1.Divisor({
+                toIdx: 1,
+                divisor: divisor,
+                token: address(tokens[tradeLen / 2])
+            });
+
+            payload.path[1] = new address[](tradeLen - tradeLen / 2);
+            payload.pairs[1] = new address[]((tradeLen - tradeLen / 2) - 1);
+            payload.extras[1] = new bytes[]((tradeLen - tradeLen / 2) - 1);
+            for (uint8 i = 0; i < tradeLen - tradeLen / 2; i++) {
+                payload.path[1][i] = address(tokens[i + tradeLen / 2]);
+
+                if (i > 0) {
+                    payload.pairs[1][i - 1] = address(pair);
+                    payload.extras[1][i - 1] = new bytes(0);
+                }
+            }
+        }
+
+        payload.inputAmounts[0] = inputAmount;
+        inputToken.approve(address(minimaRouter), inputAmount);
+        minimaRouter.swapExactInputForOutput(payload);
+
+        uint256 outputBalanceAfter = outputToken.balanceOf(alice);
+        uint256 inputBalanceAfter = inputToken.balanceOf(alice);
+
+        assertEq(
+            outputBalanceAfter,
+            outputBalanceBefore + (inputAmount * divisor) / 100,
+            "Insufficent output"
+        );
+        assertEq(
+            inputBalanceAfter,
+            inputBalanceBefore - inputAmount,
+            "Not enough input taken"
+        );
+    }
+
     function testGivesExpectedAmountAsMax(uint8 tradeLen, uint256 inputAmount)
         public
         asUser(alice)
@@ -146,42 +408,56 @@ contract MinimaRouterV1Test is ExtendedDSTest {
             return;
         }
 
-        address[] memory path = new address[](tradeLen);
-        address[] memory pairs = new address[](tradeLen - 1);
-        bytes[] memory extras = new bytes[](tradeLen - 1);
+        IMinimaRouterV1.MultiSwapPayload memory payload;
+        MockErc20 outputToken;
+        MockErc20 inputToken;
+        uint256 outputBalanceBefore;
+        uint256 inputBalanceBefore;
+        {
+            address[][] memory path = new address[][](1);
+            address[][] memory pairs = new address[][](1);
+            bytes[][] memory extras = new bytes[][](1);
 
-        MockErc20 outputToken = tokens[tradeLen - 1];
-        MockErc20 inputToken = tokens[0];
-        uint256 outputBalanceBefore = outputToken.balanceOf(alice);
-        uint256 inputBalanceBefore = inputToken.balanceOf(alice);
-        if (inputBalanceBefore < inputAmount) {
-            return;
-        }
+            uint256[] memory inputAmounts = new uint256[](1); //new uint256[](1);
 
-        for (uint8 i = 0; i < tradeLen; i++) {
-            path[i] = address(tokens[i]);
-            uint256 exchangeRate = 2 * 10**10;
+            IMinimaRouterV1.Divisor[][]
+                memory divisors = new IMinimaRouterV1.Divisor[][](0);
 
-            if (i > 0) {
-                pairs[i - 1] = address(pair);
-                extras[i - 1] = abi.encodePacked(exchangeRate);
+            outputToken = tokens[tradeLen - 1];
+            inputToken = tokens[0];
+            outputBalanceBefore = outputToken.balanceOf(alice);
+            inputBalanceBefore = inputToken.balanceOf(alice);
+
+            if (inputBalanceBefore < inputAmount) {
+                return;
             }
-        }
+            path[0] = new address[](tradeLen);
+            pairs[0] = new address[](tradeLen - 1);
+            extras[0] = new bytes[](tradeLen - 1);
+            inputAmounts[0] = inputAmount;
+            for (uint8 i = 0; i < tradeLen; i++) {
+                path[0][i] = address(tokens[i]);
 
-        ISwappaRouterV1.SwapPayload memory payload = ISwappaRouterV1
-            .SwapPayload({
+                if (i > 0) {
+                    pairs[0][i - 1] = address(pair);
+                    extras[0][i - 1] = new bytes(0);
+                }
+            }
+
+            payload = IMinimaRouterV1.MultiSwapPayload({
                 path: path,
                 pairs: pairs,
                 extras: extras,
-                inputAmount: inputAmount,
-                minOutputAmount: 9,
+                divisors: divisors,
+                inputAmounts: inputAmounts,
+                minOutputAmount: 2,
                 expectedOutputAmount: 10,
                 to: alice,
                 deadline: block.timestamp + 10,
                 partner: 0,
                 sig: new bytes(0)
             });
-
+        }
         inputToken.approve(address(minimaRouter), inputAmount);
         minimaRouter.swapExactInputForOutput(payload);
 
@@ -208,9 +484,14 @@ contract MinimaRouterV1Test is ExtendedDSTest {
             return;
         }
 
-        address[] memory path = new address[](tradeLen);
-        address[] memory pairs = new address[](tradeLen - 1);
-        bytes[] memory extras = new bytes[](tradeLen - 1);
+        address[][] memory path = new address[][](1);
+        address[][] memory pairs = new address[][](1);
+        bytes[][] memory extras = new bytes[][](1);
+
+        uint256[] memory inputAmounts = new uint256[](1); //new uint256[](1);
+
+        IMinimaRouterV1.Divisor[][]
+            memory divisors = new IMinimaRouterV1.Divisor[][](0);
 
         MockErc20 outputToken = tokens[tradeLen - 1];
         MockErc20 inputToken = tokens[0];
@@ -220,22 +501,26 @@ contract MinimaRouterV1Test is ExtendedDSTest {
         if (inputBalanceBefore < inputAmount) {
             return;
         }
-
+        path[0] = new address[](tradeLen);
+        pairs[0] = new address[](tradeLen - 1);
+        extras[0] = new bytes[](tradeLen - 1);
+        inputAmounts[0] = inputAmount;
         for (uint8 i = 0; i < tradeLen; i++) {
-            path[i] = address(tokens[i]);
+            path[0][i] = address(tokens[i]);
 
             if (i > 0) {
-                pairs[i - 1] = address(pair);
-                extras[i - 1] = new bytes(0);
+                pairs[0][i - 1] = address(pair);
+                extras[0][i - 1] = new bytes(0);
             }
         }
 
-        ISwappaRouterV1.SwapPayload memory payload = ISwappaRouterV1
-            .SwapPayload({
+        IMinimaRouterV1.MultiSwapPayload memory payload = IMinimaRouterV1
+            .MultiSwapPayload({
                 path: path,
                 pairs: pairs,
                 extras: extras,
-                inputAmount: inputAmount,
+                divisors: divisors,
+                inputAmounts: inputAmounts,
                 minOutputAmount: inputAmount - 1,
                 expectedOutputAmount: inputAmount + 1,
                 to: alice,
@@ -270,32 +555,43 @@ contract MinimaRouterV1Test is ExtendedDSTest {
             return;
         }
 
-        address[] memory path = new address[](tradeLen);
-        address[] memory pairs = new address[](tradeLen - 1);
-        bytes[] memory extras = new bytes[](tradeLen - 1);
+        address[][] memory path = new address[][](1);
+        address[][] memory pairs = new address[][](1);
+        bytes[][] memory extras = new bytes[][](1);
 
+        uint256[] memory inputAmounts = new uint256[](1); //new uint256[](1);
+
+        IMinimaRouterV1.Divisor[][]
+            memory divisors = new IMinimaRouterV1.Divisor[][](0);
+
+        MockErc20 outputToken = tokens[tradeLen - 1];
         MockErc20 inputToken = tokens[0];
+        uint256 outputBalanceBefore = outputToken.balanceOf(alice);
         uint256 inputBalanceBefore = inputToken.balanceOf(alice);
 
         if (inputBalanceBefore < inputAmount) {
             return;
         }
-
+        path[0] = new address[](tradeLen);
+        pairs[0] = new address[](tradeLen - 1);
+        extras[0] = new bytes[](tradeLen - 1);
+        inputAmounts[0] = inputAmount;
         for (uint8 i = 0; i < tradeLen; i++) {
-            path[i] = address(tokens[i]);
+            path[0][i] = address(tokens[i]);
 
             if (i > 0) {
-                pairs[i - 1] = address(pair);
-                extras[i - 1] = new bytes(0);
+                pairs[0][i - 1] = address(pair);
+                extras[0][i - 1] = new bytes(0);
             }
         }
 
-        ISwappaRouterV1.SwapPayload memory payload = ISwappaRouterV1
-            .SwapPayload({
+        IMinimaRouterV1.MultiSwapPayload memory payload = IMinimaRouterV1
+            .MultiSwapPayload({
                 path: path,
                 pairs: pairs,
                 extras: extras,
-                inputAmount: inputAmount,
+                divisors: divisors,
+                inputAmounts: inputAmounts,
                 minOutputAmount: inputAmount + 1,
                 expectedOutputAmount: inputAmount + 1,
                 to: alice,
@@ -306,7 +602,7 @@ contract MinimaRouterV1Test is ExtendedDSTest {
 
         inputToken.approve(address(minimaRouter), inputAmount);
 
-        vm.expectRevert(bytes("MinimaRouter: Insufficient output amount!"));
+        vm.expectRevert(bytes("MinimaRouter: Insufficient output"));
         minimaRouter.swapExactInputForOutput(payload);
     }
 }

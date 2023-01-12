@@ -4,25 +4,31 @@ pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "./interfaces/ISwappaPairV1.sol";
-import "./interfaces/ISwappaRouterV1.sol";
+import "./interfaces/IMinimaRouterV1.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "./interfaces/IFarm.sol";
 import "./interfaces/INative.sol";
 
-contract MinimaRouterV1 is ISwappaRouterV1, Ownable {
+contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
     using SafeMath for uint256;
 
+    // Tracks signers for approving routes
     mapping(address => bool) private adminSigner;
+
+    // Tracks fees for partners.  Fee is calculated as fee / FEE_DENOMINATOR
     mapping(uint256 => uint256) private partnerFees;
+
+    // Tracks wallets that can control fee for a given partner
     mapping(uint256 => address) private partnerAdmin;
+
+    // Tracks internal balances
+    mapping(address => uint256) private outputBalancesBefore; //token => amount
 
     // Maximum fee that a partner can set is 5%
     // Minima takes no additional fee - fee is only taken by partners who integrate
     uint256 public constant MAX_PARTNER_FEE = 5 * 10**8;
     uint256 public constant FEE_DENOMINATOR = 10**10;
-
-    uint256[49] private __GAP; // gap for upgrade safety
 
     event Swap(
         address indexed sender,
@@ -53,7 +59,7 @@ contract MinimaRouterV1 is ISwappaRouterV1, Ownable {
     );
 
     modifier ensure(uint256 deadline) {
-        require(deadline >= block.timestamp, "SwappaRouter: Expired!");
+        require(deadline >= block.timestamp, "MinimaRouterV1: Expired!");
         _;
     }
 
@@ -96,6 +102,8 @@ contract MinimaRouterV1 is ISwappaRouterV1, Ownable {
         external
         onlyAdmin
     {
+        outputBalancesBefore[token] = 0;
+
         uint256 toClaim = IERC20(token).balanceOf(address(this));
         IERC20(token).transfer(reciever, toClaim);
     }
@@ -170,14 +178,6 @@ contract MinimaRouterV1 is ISwappaRouterV1, Ownable {
         return ecrecover(message, v, r, s);
     }
 
-    function getFees(uint256 partnerId)
-        external
-        view
-        returns (uint256[2] memory)
-    {
-        return [partnerFees[partnerId], 0];
-    }
-
     function getPartnerFee(uint256 partnerId) external view returns (uint256) {
         return partnerFees[partnerId];
     }
@@ -224,6 +224,7 @@ contract MinimaRouterV1 is ISwappaRouterV1, Ownable {
         }
     }
 
+    // Disperse the output amount to the recipient, taking into account the partner fee and positive slippage.
     function disperseWithFee(
         address output,
         uint256 minOutputAmount,
@@ -242,7 +243,7 @@ contract MinimaRouterV1 is ISwappaRouterV1, Ownable {
 
         require(
             outputAmount >= minOutputAmount,
-            "MinimaRouter: Insufficient output amount!"
+            "MinimaRouter: Insufficient output"
         );
 
         require(
@@ -257,227 +258,83 @@ contract MinimaRouterV1 is ISwappaRouterV1, Ownable {
             revert("MinimaRouter: Partner fee transfer failed");
         }
 
+        // Record internal balance
+        updateBalances(output);
         return outputAmount;
     }
 
-    function swapMultiExactInputForOutputNativeIn(
-        MultiSwapPayload calldata details,
-        address wrappedAddr
-    ) external payable override returns (uint256[] memory) {
-        require(details.deadline >= block.timestamp, "SwappaRouter: Expired!");
-        require(
-            details.path.length == details.pairs.length,
-            "MinimaRouter: Path and Pairs mismatch!"
-        );
-        require(
-            details.pairs.length == details.extras.length,
-            "MinimaRouter: Pairs and Extras mismatch!"
-        );
-        require(
-            details.pairs.length > 0,
-            "MinimaRouter: Must have at least one pair!"
-        );
-
-        INative(wrappedAddr).deposit{value: msg.value}();
-        uint256 usedWrapped = 0;
-
-        for (uint256 i = 0; i < details.path.length; i++) {
-            address output = details.path[i][details.path[i].length - 1];
-
-            uint256 outputBalanceBefore = ERC20(output).balanceOf(
-                address(this)
-            );
-            if (output == wrappedAddr) {
-                outputBalanceBefore -= details.inputAmounts[i]; //If output is the wrapped token, we are taking the balance after that deposit happens
-            }
-
-            require(
-                ERC20(wrappedAddr).transferFrom(
-                    address(this),
-                    details.pairs[i][0],
-                    details.inputAmounts[i]
-                ),
-                "MinimaRouter: Wrapped transferfrom failed!"
-            );
-
-            usedWrapped += details.inputAmounts[i];
-            require(
-                usedWrapped <= msg.value,
-                "MinimaRouter: Attempt to use more wrapped token the provided native token."
-            );
-
-            for (uint256 j; j < details.pairs[i].length; j++) {
-                (address pairInput, address pairOutput) = (
-                    details.path[i][j],
-                    details.path[i][j + 1]
-                );
-                address next = j < details.pairs[i].length - 1
-                    ? details.pairs[i][j + 1]
-                    : (
-                        details.forwardTo[i] == 0
-                            ? address(this)
-                            : details.pairs[details.forwardTo[i]][0]
-                    );
-                bytes memory data = details.extras[i][j];
-                ISwappaPairV1(details.pairs[i][j]).swap(
-                    pairInput,
-                    pairOutput,
-                    next,
-                    data
-                );
-            }
-
-            uint256 partnerId = getPartnerInfo(
-                details.partner,
-                details.deadline,
-                details.path[i][0],
-                output,
-                details.sig
-            );
-            uint256 outputAmount = disperseWithFee(
-                output,
-                details.minOutputAmount,
-                details.expectedOutputAmount,
-                ERC20(output).balanceOf(address(this)) - outputBalanceBefore,
-                details.to,
-                partnerId
-            );
-            emit Swap(
-                msg.sender,
-                details.to,
-                details.path[i][0],
-                output,
-                details.inputAmounts[i],
-                outputAmount,
-                partnerId
-            );
-        }
+    function updateBalances(address output) internal returns (uint256) {
+        outputBalancesBefore[output] = ERC20(output).balanceOf(address(this)); //Record the new fee balance
     }
 
-    function swapMultiExactInputForOutputNativeOut(
-        MultiSwapPayload calldata details,
-        address wrappedAddr
-    ) external override returns (uint256[] memory) {
-        require(details.deadline >= block.timestamp, "SwappaRouter: Expired!");
-        require(
-            details.path.length == details.pairs.length,
-            "MinimaRouter: Path and Pairs mismatch!"
-        );
-        require(
-            details.pairs.length == details.extras.length,
-            "MinimaRouter: Pairs and Extras mismatch!"
-        );
-        require(
-            details.pairs.length > 0,
-            "MinimaRouter: Must have at least one pair!"
-        );
+    function getDivisorTransferAmounts(Divisor[] memory divisors)
+        internal
+        view
+        returns (uint256[] memory)
+    {
+        uint256[] memory transferAmounts = new uint256[](divisors.length);
+        for (uint256 k; k < divisors.length; k++) {
+            // If a divisor is 0, dont transfer it anywhere. It will be picked up by the next swap.
+            uint8 weight = divisors[k].divisor;
+            require(weight <= 100, "MinimaRouter: Divisor too high");
 
-        uint256 withdrawAmount;
-
-        for (uint256 i = 0; i < details.path.length; i++) {
-            uint256 wrappedBalanceBefore = ERC20(wrappedAddr).balanceOf(
-                address(this)
-            );
-
-            require(
-                ERC20(details.path[i][0]).transferFrom(
-                    msg.sender,
-                    details.pairs[i][0],
-                    details.inputAmounts[i]
-                ),
-                "MinimaRouter: Initial transferFrom failed!"
-            );
-
-            for (uint256 j; j < details.pairs[i].length; j++) {
-                (address pairInput, address pairOutput) = (
-                    details.path[i][j],
-                    details.path[i][j + 1]
-                );
-                address next = j < details.pairs[i].length - 1
-                    ? details.pairs[i][j + 1]
-                    : (
-                        details.forwardTo[i] == 0
-                            ? address(this)
-                            : details.pairs[details.forwardTo[i]][0]
-                    );
-                bytes memory data = details.extras[i][j];
-                ISwappaPairV1(details.pairs[i][j]).swap(
-                    pairInput,
-                    pairOutput,
-                    next,
-                    data
-                );
+            if (divisors[k].divisor != 0) {
+                uint256 swapResult = ERC20(divisors[k].token).balanceOf(
+                    address(this)
+                ) - outputBalancesBefore[divisors[k].token];
+                uint256 transferAmount = swapResult.mul(weight).div(100);
+                transferAmounts[k] = transferAmount;
             }
-            uint256 wrappedBalanceAfter = ERC20(wrappedAddr).balanceOf(
-                address(this)
-            );
-
-            uint256 partnerId = getPartnerInfo(
-                details.partner,
-                details.deadline,
-                details.path[i][0],
-                wrappedAddr,
-                details.sig
-            );
-            //Output is always the wrapped address, we are capturing positive slippage with that then unwrapping the output amount and transfering that to the user.
-            uint256 outputAmount = disperseWithFee(
-                wrappedAddr,
-                details.minOutputAmount,
-                details.expectedOutputAmount,
-                wrappedBalanceAfter - wrappedBalanceBefore,
-                address(this),
-                partnerId
-            );
-            withdrawAmount += outputAmount;
-            emit Swap(
-                msg.sender,
-                details.to,
-                details.path[i][0],
-                wrappedAddr,
-                details.inputAmounts[i],
-                outputAmount,
-                partnerId
-            );
         }
-        INative(wrappedAddr).withdraw(withdrawAmount);
-        payable(address(details.to)).transfer(withdrawAmount);
+        return transferAmounts;
     }
 
-    function swapMultiExactInputForOutput(MultiSwapPayload calldata details)
+    function swapExactInputForOutput(MultiSwapPayload calldata details)
         external
         override
         returns (uint256[] memory)
     {
-        require(details.deadline >= block.timestamp, "SwappaRouter: Expired!");
+        require(
+            details.deadline >= block.timestamp,
+            "MinimaRouterV1: Expired!"
+        );
         require(
             details.path.length == details.pairs.length,
-            "MinimaRouter: Path and Pairs mismatch!"
+            "MinimaRouterV1: Path and Pairs mismatch!"
         );
         require(
             details.pairs.length == details.extras.length,
-            "MinimaRouter: Pairs and Extras mismatch!"
+            "MinimaRouterV1: Pairs and Extras mismatch!"
         );
         require(
             details.pairs.length > 0,
-            "MinimaRouter: Must have at least one pair!"
+            "MinimaRouterV1: Must have at least one pair!"
+        );
+        require(
+            details.divisors.length == details.path.length - 1,
+            "MinimaRouterV1: Each Path must have a divisor!"
+        );
+        require(
+            details.inputAmounts.length == details.path.length,
+            "MinimaRouterV1: Each Path must have an input amount!"
         );
 
+        address output = details.path[details.path.length - 1][
+            details.path[details.path.length - 1].length - 1
+        ];
+
         for (uint256 i = 0; i < details.path.length; i++) {
-            require(
-                ERC20(details.path[i][0]).transferFrom(
-                    msg.sender,
-                    details.pairs[i][0],
-                    details.inputAmounts[i]
-                ),
-                "MinimaRouter: Initial transferFrom failed!"
-            );
-            address output = details.path[i][details.path[i].length - 1];
-            uint256 outputBalanceBefore = ERC20(output).balanceOf(
-                address(this)
-            );
-            address receiver = details.forwardTo[i] == 0
-                ? address(this)
-                : details.pairs[details.forwardTo[i]][0];
+            //Transfer initial amounts
+            if (details.inputAmounts[i] > 0) {
+                require(
+                    ERC20(details.path[i][0]).transferFrom(
+                        msg.sender,
+                        details.pairs[i][0],
+                        details.inputAmounts[i]
+                    ),
+                    "MinimaRouterV1: Initial transferFrom failed!"
+                );
+            }
 
             for (uint256 j; j < details.pairs[i].length; j++) {
                 (address pairInput, address pairOutput) = (
@@ -486,183 +343,40 @@ contract MinimaRouterV1 is ISwappaRouterV1, Ownable {
                 );
                 address next = j < details.pairs[i].length - 1
                     ? details.pairs[i][j + 1]
-                    : receiver;
-                bytes memory data = details.extras[i][j];
+                    : address(this);
+
                 ISwappaPairV1(details.pairs[i][j]).swap(
                     pairInput,
                     pairOutput,
                     next,
-                    data
+                    details.extras[i][j]
                 );
             }
 
-            uint256 tradeOutput = ERC20(output).balanceOf(address(this)) -
-                outputBalanceBefore;
-            uint256 partnerId = getPartnerInfo(
-                details.partner,
-                details.deadline,
-                details.path[0][0],
-                output,
-                details.sig
-            );
-            uint256 outputAmount = disperseWithFee(
-                output,
-                details.minOutputAmount,
-                details.expectedOutputAmount,
-                tradeOutput,
-                details.to,
-                partnerId
-            );
-            emit Swap(
-                msg.sender,
-                details.to,
-                details.path[i][0],
-                output,
-                details.inputAmounts[i],
-                outputAmount,
-                partnerId
-            );
-        }
-    }
+            if (i < details.path.length - 1) {
+                uint256[] memory transferAmounts = getDivisorTransferAmounts(
+                    details.divisors[i]
+                );
 
-    function swapExactInputForOutput(SwapPayload calldata details)
-        external
-        override
-        ensure(details.deadline)
-        returns (uint256 outputAmount)
-    {
-        require(
-            details.path.length == details.pairs.length + 1,
-            "MinimaRouter: Path and Pairs mismatch!"
-        );
-        require(
-            details.pairs.length == details.extras.length,
-            "MinimaRouter: Pairs and Extras mismatch!"
-        );
-        require(
-            details.pairs.length > 0,
-            "MinimaRouter: Must have at least one pair!"
-        );
-
-        require(
-            ERC20(details.path[0]).transferFrom(
-                msg.sender,
-                details.pairs[0],
-                details.inputAmount
-            ),
-            "MinimaRouter: Initial transferFrom failed!"
-        );
-        address output = details.path[details.path.length - 1];
-        uint256 outputBalanceBefore = ERC20(output).balanceOf(address(this));
-        for (uint256 i; i < details.pairs.length; i++) {
-            (address pairInput, address pairOutput) = (
-                details.path[i],
-                details.path[i + 1]
-            );
-            address next = i < details.pairs.length - 1
-                ? details.pairs[i + 1]
-                : address(this);
-            bytes memory data = details.extras[i];
-            ISwappaPairV1(details.pairs[i]).swap(
-                pairInput,
-                pairOutput,
-                next,
-                data
-            );
-        }
-        uint256 tradeOutput = ERC20(output).balanceOf(address(this)) -
-            outputBalanceBefore;
-        uint256 partnerId = getPartnerInfo(
-            details.partner,
-            details.deadline,
-            details.path[0],
-            output,
-            details.sig
-        );
-        outputAmount = disperseWithFee(
-            output,
-            details.minOutputAmount,
-            details.expectedOutputAmount,
-            tradeOutput,
-            details.to,
-            partnerId
-        );
-        emit Swap(
-            msg.sender,
-            details.to,
-            details.path[0],
-            output,
-            details.inputAmount,
-            outputAmount,
-            partnerId
-        );
-    }
-
-    function swapExactInputForOutputNativeIn(
-        SwapPayload calldata details,
-        address wrappedAddr
-    )
-        external
-        payable
-        override
-        ensure(details.deadline)
-        returns (uint256 outputAmount)
-    {
-        require(
-            details.path.length == details.pairs.length + 1,
-            "MinimaRouter: Path and Pairs mismatch!"
-        );
-        require(
-            details.pairs.length == details.extras.length,
-            "MinimaRouter: Pairs and Extras mismatch!"
-        );
-        require(
-            details.pairs.length > 0,
-            "MinimaRouter: Must have at least one pair!"
-        );
-
-        uint256 outputBalanceBefore;
-        uint256 wrappedBalanceBefore;
-        uint256 wrappedBalanceAfter;
-        address output = details.path[details.path.length - 1];
-
-        wrappedBalanceBefore = ERC20(wrappedAddr).balanceOf(address(this));
-        INative(wrappedAddr).deposit{value: msg.value}();
-        wrappedBalanceAfter = ERC20(wrappedAddr).balanceOf(address(this));
-        ERC20(wrappedAddr).transferFrom(
-            address(this),
-            details.pairs[0],
-            wrappedBalanceAfter - wrappedBalanceBefore
-        );
-
-        for (uint256 i; i < details.pairs.length; i++) {
-            (address pairInput, address pairOutput) = (
-                details.path[i],
-                details.path[i + 1]
-            );
-            address next = i < details.pairs.length - 1
-                ? details.pairs[i + 1]
-                : address(this);
-            bytes memory data = details.extras[i];
-            ISwappaPairV1(details.pairs[i]).swap(
-                pairInput,
-                pairOutput,
-                next,
-                data
-            );
+                for (uint256 k; k < transferAmounts.length; k++) {
+                    ERC20(details.divisors[i][k].token).transfer(
+                        details.pairs[details.divisors[i][k].toIdx][0],
+                        transferAmounts[k]
+                    );
+                }
+            }
         }
 
         uint256 tradeOutput = ERC20(output).balanceOf(address(this)) -
-            outputBalanceBefore;
-
+            outputBalancesBefore[output];
         uint256 partnerId = getPartnerInfo(
             details.partner,
             details.deadline,
-            details.path[0],
+            details.path[0][0],
             output,
             details.sig
         );
-        outputAmount = disperseWithFee(
+        uint256 outputAmount = disperseWithFee(
             output,
             details.minOutputAmount,
             details.expectedOutputAmount,
@@ -673,96 +387,12 @@ contract MinimaRouterV1 is ISwappaRouterV1, Ownable {
         emit Swap(
             msg.sender,
             details.to,
-            details.path[0],
+            details.path[0][0],
             output,
-            details.inputAmount,
+            details.inputAmounts[0],
             outputAmount,
             partnerId
         );
-    }
-
-    function swapExactInputForOutputNativeOut(
-        SwapPayload calldata details,
-        address wrappedAddr
-    )
-        external
-        override
-        ensure(details.deadline)
-        returns (uint256 outputAmount)
-    {
-        require(
-            details.path.length == details.pairs.length + 1,
-            "MinimaRouter: Path and Pairs mismatch!"
-        );
-        require(
-            details.pairs.length == details.extras.length,
-            "MinimaRouter: Pairs and Extras mismatch!"
-        );
-        require(
-            details.pairs.length > 0,
-            "MinimaRouter: Must have at least one pair!"
-        );
-
-        uint256 wrappedBalanceBefore = ERC20(wrappedAddr).balanceOf(
-            address(this)
-        );
-        address output = details.path[details.path.length - 1];
-
-        require(
-            ERC20(details.path[0]).transferFrom(
-                msg.sender,
-                details.pairs[0],
-                details.inputAmount
-            ),
-            "MinimaRouter: Initial transferFrom failed!"
-        );
-
-        for (uint256 i; i < details.pairs.length; i++) {
-            (address pairInput, address pairOutput) = (
-                details.path[i],
-                details.path[i + 1]
-            );
-            address next = i < details.pairs.length - 1
-                ? details.pairs[i + 1]
-                : address(this);
-            bytes memory data = details.extras[i];
-            ISwappaPairV1(details.pairs[i]).swap(
-                pairInput,
-                pairOutput,
-                next,
-                data
-            );
-        }
-
-        uint256 tradeOutput = ERC20(wrappedAddr).balanceOf(address(this)) -
-            wrappedBalanceBefore;
-        uint256 partnerId = getPartnerInfo(
-            details.partner,
-            details.deadline,
-            details.path[0],
-            output,
-            details.sig
-        );
-        //Capture the slippage in the wrapped token, not the native.
-        outputAmount = disperseWithFee(
-            wrappedAddr,
-            details.minOutputAmount,
-            details.expectedOutputAmount,
-            tradeOutput,
-            address(this),
-            partnerId
-        );
-        emit Swap(
-            msg.sender,
-            details.to,
-            details.path[0],
-            output,
-            details.inputAmount,
-            outputAmount,
-            partnerId
-        );
-        INative(wrappedAddr).withdraw(outputAmount);
-        payable(address(details.to)).transfer(outputAmount);
     }
 
     receive() external payable {}

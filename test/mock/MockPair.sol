@@ -2,6 +2,7 @@ pragma solidity 0.6.8;
 
 import {ISwappaPairV1} from "../../src/interfaces/ISwappaPairV1.sol";
 import {MockErc20} from "./MockErc20.sol";
+import "forge-std/console.sol";
 
 /**
     This mock pair will transfer out the input amount * numerator / denominator
