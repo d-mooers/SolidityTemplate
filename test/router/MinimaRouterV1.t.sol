@@ -9,6 +9,7 @@ import {Test} from "forge-std/Test.sol";
 import {MinimaRouterV1} from "../../src/MinimaRouterV1.sol";
 import {IMinimaRouterV1} from "../../src/interfaces/IMinimaRouterV1.sol";
 import {MockPair} from "../mock/MockPair.sol";
+import {MinimaRouterV1External} from "../mock/MinimaRouterV1External.sol";
 
 import "forge-std/console.sol";
 
@@ -22,6 +23,8 @@ contract MinimaRouterV1Test is ExtendedDSTest {
 
     MinimaRouterV1 public minimaRouter;
     MockPair public pair;
+    MinimaRouterV1External public minimaRouterExternal;
+
     MockErc20[NUM_TOKENS] public tokens;
 
     function setUp() public override {
@@ -30,6 +33,7 @@ contract MinimaRouterV1Test is ExtendedDSTest {
         address[] memory adminSigners = new address[](1);
         adminSigners[0] = alice;
         minimaRouter = new MinimaRouterV1(alice, adminSigners);
+        minimaRouterExternal = new MinimaRouterV1External(alice, adminSigners);
 
         pair = new MockPair();
 
@@ -60,6 +64,47 @@ contract MinimaRouterV1Test is ExtendedDSTest {
 
         vm.expectRevert(bytes("Ownable: caller is not the owner"));
         minimaRouter.setAdmin(prankster, true);
+    }
+
+    function testGetPartnerInfoReturns0OnInvalidEcRecover() public {
+        uint256 partnerId = 9;
+        uint256 deadline = block.timestamp + 1000;
+        address tokenIn = address(tokens[0]);
+        address tokenOut = address(tokens[1]);
+        bytes memory sig = new bytes(65);
+        bytes32 message = minimaRouterExternal.prefixed__External(
+            keccak256(
+                abi.encodePacked(
+                    partnerId,
+                    deadline,
+                    tokenIn,
+                    tokenOut,
+                    minimaRouterExternal
+                )
+            )
+        );
+
+        sig[64] = 0x01;
+
+        (uint8 v, bytes32 r, bytes32 s) = minimaRouterExternal
+            .splitSignature__External(sig);
+
+        // ecrecover should fail if v is not 27 or 28
+        assertEq(uint256(v), 1);
+
+        address expectedSigner = ecrecover(message, v, r, s);
+
+        assertEq(expectedSigner, address(0));
+
+        uint256 partnerInfo = minimaRouterExternal.getPartnerInfo__External(
+            partnerId,
+            deadline,
+            tokenIn,
+            tokenOut,
+            sig
+        );
+
+        assertEq(partnerInfo, 0);
     }
 
     function testSetPartnerFee(uint256 feeNumerator, uint256 partnerId)

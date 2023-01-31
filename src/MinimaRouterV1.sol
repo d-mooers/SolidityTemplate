@@ -201,7 +201,8 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
         (v, r, s) = splitSignature(sig);
         address signer = ecrecover(message, v, r, s);
 
-        if (adminSigner[signer]) {
+        // QSP-1: Check for null return from ecrecover and for admin rights of signer
+        if (signer != address(0) && adminSigner[signer]) {
             return partnerId;
         }
         return 0;
