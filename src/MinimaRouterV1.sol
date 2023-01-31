@@ -30,6 +30,8 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
     uint256 public constant MAX_PARTNER_FEE = 5 * 10**8;
     uint256 public constant FEE_DENOMINATOR = 10**10;
 
+    uint256 public constant DIVISOR_DENOMINATOR = 100;
+
     event Swap(
         address indexed sender,
         address to,
@@ -268,25 +270,47 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
         outputBalancesBefore[output] = ERC20(output).balanceOf(address(this)); //Record the new fee balance
     }
 
+    // Here we assume divisors are sorted by token address
+    // For each token, a total weigh of 100 MUST be provided
+    // Otherwise, the function will revert
     function getDivisorTransferAmounts(Divisor[] memory divisors)
         internal
         view
         returns (uint256[] memory)
     {
-        uint256[] memory transferAmounts = new uint256[](divisors.length);
-        for (uint256 k; k < divisors.length; k++) {
-            // If a divisor is 0, dont transfer it anywhere. It will be picked up by the next swap.
-            uint8 weight = divisors[k].divisor;
-            require(weight <= 100, "MinimaRouter: Divisor too high");
-
-            if (divisors[k].divisor != 0) {
-                uint256 swapResult = ERC20(divisors[k].token).balanceOf(
-                    address(this)
-                ) - outputBalancesBefore[divisors[k].token];
-                uint256 transferAmount = swapResult.mul(weight).div(100);
-                transferAmounts[k] = transferAmount;
+        // Weight sum is initially the expected total weight, and we decrement it by the weight of each token to track for correct weight instead of creating another variable
+        uint256 weightSumExpected = 100;
+        for (uint8 i = 1; i < divisors.length; i++) {
+            // If i is not the same token as i-1, it must be a new token, so add 100 to the expected weight sum
+            if (divisors[i].token != divisors[i - 1].token) {
+                weightSumExpected = weightSumExpected.add(100);
             }
         }
+
+        uint256[] memory transferAmounts = new uint256[](divisors.length);
+        for (uint256 k; k < divisors.length; k++) {
+            uint8 weight = divisors[k].divisor;
+            require(weight <= 100, "MinimaRouter: Divisor too high");
+            require(weight > 0, "MinimaRouter: Divisor too low");
+            require(
+                weightSumExpected >= weight,
+                "MinimaRouter: Invalid divisors"
+            );
+
+            weightSumExpected = weightSumExpected.sub(weight);
+
+            uint256 swapResult = ERC20(divisors[k].token).balanceOf(
+                address(this)
+            ) - outputBalancesBefore[divisors[k].token];
+
+            uint256 transferAmount = swapResult.mul(weight).div(
+                DIVISOR_DENOMINATOR
+            );
+            transferAmounts[k] = transferAmount;
+        }
+
+        // If the weight sum is not 0, then the divisors are invalid
+        require(weightSumExpected == 0, "MinimaRouter: Invalid divisors");
         return transferAmounts;
     }
 

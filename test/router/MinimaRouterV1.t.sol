@@ -66,6 +66,70 @@ contract MinimaRouterV1Test is ExtendedDSTest {
         minimaRouter.setAdmin(prankster, true);
     }
 
+    function testShouldFailWhenDivisorIsZero(uint8 token) public {
+        IMinimaRouterV1.Divisor[]
+            memory divisors = new IMinimaRouterV1.Divisor[](1);
+        divisors[0] = IMinimaRouterV1.Divisor({
+            toIdx: 1,
+            divisor: 0,
+            token: address(tokens[token % NUM_TOKENS])
+        });
+        vm.expectRevert(bytes("MinimaRouter: Divisor too low"));
+        minimaRouterExternal.getDivisorTransferAmounts__External(divisors);
+    }
+
+    function testShouldFailWhenDivisorIsTooHigh(uint8 token, uint8 _amount)
+        public
+    {
+        IMinimaRouterV1.Divisor[]
+            memory divisors = new IMinimaRouterV1.Divisor[](1);
+        uint8 amount = (_amount % 100) + 101;
+        divisors[0] = IMinimaRouterV1.Divisor({
+            toIdx: 1,
+            divisor: amount,
+            token: address(tokens[token % NUM_TOKENS])
+        });
+        vm.expectRevert(bytes("MinimaRouter: Divisor too high"));
+        minimaRouterExternal.getDivisorTransferAmounts__External(divisors);
+    }
+
+    function testShouldFailWhenDivisorsDoNotSumTo100() public {
+        IMinimaRouterV1.Divisor[]
+            memory divisors = new IMinimaRouterV1.Divisor[](2);
+        divisors[0] = IMinimaRouterV1.Divisor({
+            toIdx: 1,
+            divisor: 50,
+            token: address(tokens[0])
+        });
+        divisors[1] = IMinimaRouterV1.Divisor({
+            toIdx: 1,
+            divisor: 49,
+            token: address(tokens[0])
+        });
+        vm.expectRevert(bytes("MinimaRouter: Invalid divisors"));
+        minimaRouterExternal.getDivisorTransferAmounts__External(divisors);
+    }
+
+    function testShouldFailWhenDivisorsDoNotSumTo100Fuzz(uint8 numDivisors)
+        public
+    {
+        if (numDivisors == 0) {
+            return;
+        }
+
+        IMinimaRouterV1.Divisor[]
+            memory divisors = new IMinimaRouterV1.Divisor[](numDivisors);
+        for (uint8 i = 0; i < numDivisors; i++) {
+            divisors[i] = IMinimaRouterV1.Divisor({
+                toIdx: 1,
+                divisor: 99,
+                token: address(tokens[i % NUM_TOKENS])
+            });
+        }
+        vm.expectRevert(bytes("MinimaRouter: Invalid divisors"));
+        minimaRouterExternal.getDivisorTransferAmounts__External(divisors);
+    }
+
     function testGetPartnerInfoReturns0OnInvalidEcRecover() public {
         uint256 partnerId = 9;
         uint256 deadline = block.timestamp + 1000;
@@ -362,7 +426,7 @@ contract MinimaRouterV1Test is ExtendedDSTest {
         uint8 divisor
     ) public asUser(alice) {
         divisor = divisor % 100;
-        if (tradeLen < 4 || inputAmount == 0 || divisor == 0) {
+        if (tradeLen < 4 || inputAmount < 100 || divisor == 0) {
             return;
         }
 
@@ -406,10 +470,15 @@ contract MinimaRouterV1Test is ExtendedDSTest {
                     payload.extras[0][i - 1] = new bytes(0);
                 }
             }
-            payload.divisors[0] = new IMinimaRouterV1.Divisor[](1);
+            payload.divisors[0] = new IMinimaRouterV1.Divisor[](2);
             payload.divisors[0][0] = IMinimaRouterV1.Divisor({
                 toIdx: 1,
                 divisor: divisor,
+                token: address(tokens[tradeLen / 2])
+            });
+            payload.divisors[0][1] = IMinimaRouterV1.Divisor({
+                toIdx: 1,
+                divisor: 100 - divisor,
                 token: address(tokens[tradeLen / 2])
             });
 
@@ -433,9 +502,10 @@ contract MinimaRouterV1Test is ExtendedDSTest {
         uint256 outputBalanceAfter = outputToken.balanceOf(alice);
         uint256 inputBalanceAfter = inputToken.balanceOf(alice);
 
-        assertEq(
+        assertApproxEq(
             outputBalanceAfter,
-            outputBalanceBefore + (inputAmount * divisor) / 100,
+            outputBalanceBefore + inputAmount,
+            1,
             "Insufficent output"
         );
         assertEq(
