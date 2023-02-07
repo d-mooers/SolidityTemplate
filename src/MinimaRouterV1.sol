@@ -88,6 +88,7 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
         public
         Ownable()
     {
+        require(admin != address(0), "MinimaRouterV1: Admin can not be 0 address!");
         transferOwnership(admin);
 
         // Make the null tenant the admin wallet
@@ -96,6 +97,7 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
 
         // Add the initial signers
         for (uint8 i = 0; i < initialSigners.length; i++) {
+            require(initialSigners[i] != address(0), "MinimaRouterV1: Initial signers can not be 0 address!");
             adminSigner[initialSigners[i]] = true;
         }
     }
@@ -104,6 +106,7 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
         external
         onlyAdmin
     {
+        require(reciever != address(0), "MinimaRouterV1: Reciever can not be 0 address!");
         outputBalancesBefore[token] = 0;
 
         uint256 toClaim = IERC20(token).balanceOf(address(this));
@@ -138,6 +141,7 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
     }
 
     function setAdmin(address addr, bool isAdmin) external onlyOwner {
+        require(addr != address(0), "MinimaRouterV1: Admin can not be 0 address!");
         adminSigner[addr] = isAdmin;
     }
 
@@ -145,6 +149,7 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
         external
         partnerAuthorized(partnerId)
     {
+        require(admin != address(0), "MinimaRouterV1: Admin can not be 0 address!");
         partnerAdmin[partnerId] = admin;
     }
 
@@ -343,6 +348,10 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
             details.inputAmounts.length == details.path.length,
             "MinimaRouterV1: Each Path must have an input amount!"
         );
+        require(
+            details.expectedOutputAmount >= details.minOutputAmount,
+            "MinimaRouterV1: expectedOutputAmount should be >= minOutputAmount"
+        );
 
         address output = details.path[details.path.length - 1][
             details.path[details.path.length - 1].length - 1
@@ -351,6 +360,7 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
         bool[] memory completedPaths = new bool[](details.path.length);
 
         for (uint256 i = 0; i < details.path.length; i++) {
+            require(details.pairs[i].length > 0, "MinimaRouterV1: Inner pairs length can not be 0!");
             require(details.pairs[i].length == details.path[i].length - 1, "MinimaRouterV1: Inner path and pairs length mismatch!");
             //Transfer initial amounts
             if (details.inputAmounts[i] > 0) {
