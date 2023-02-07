@@ -304,9 +304,9 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
 
             weightSumExpected = weightSumExpected.sub(weight);
 
-            uint256 swapResult = ERC20(divisors[k].token).balanceOf(
+            uint256 swapResult = SafeMath.sub(ERC20(divisors[k].token).balanceOf(
                 address(this)
-            ) - outputBalancesBefore[divisors[k].token];
+            ), outputBalancesBefore[divisors[k].token]);
 
             uint256 transferAmount = swapResult.mul(weight).div(
                 DIVISOR_DENOMINATOR
@@ -409,8 +409,8 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
             completedPaths[i] = true;
         }
 
-        uint256 tradeOutput = ERC20(output).balanceOf(address(this)) -
-            outputBalancesBefore[output];
+        uint256 tradeOutput = SafeMath.sub(ERC20(output).balanceOf(address(this)),
+            outputBalancesBefore[output]);
         uint256 partnerId = getPartnerInfo(
             details.partner,
             details.deadline,
