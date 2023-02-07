@@ -157,8 +157,9 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
         external
         partnerAuthorized(partnerId)
     {
-        require(feeNumerator <= MAX_PARTNER_FEE, "MinimaRouter: Fee too high");
-        uint256 oldFee = partnerFees[partnerId];
+        require(feeNumerator <= MAX_PARTNER_FEE, "MinimaRouterV1: Fee too high");
+        uint256 oldFee = partnerFees[partnerId];    
+        require(oldFee != feeNumerator, "MinimaRouterV1: Old fee can not equal new fee!");
         partnerFees[partnerId] = feeNumerator;
         emit FeeChanged(partnerId, msg.sender, false, oldFee, feeNumerator);
     }

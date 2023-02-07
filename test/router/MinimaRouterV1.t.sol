@@ -54,6 +54,15 @@ contract MinimaRouterV1Test is ExtendedDSTest {
         vm.stopPrank();
     }
 
+    function testSetPartnerFeeSameAsOld()
+        public
+        asUser(alice)
+    {
+        minimaRouter.setPartnerFee(10, 5000);
+        vm.expectRevert(bytes("MinimaRouterV1: Old fee can not equal new fee!"));
+        minimaRouter.setPartnerFee(10, 5000);   
+    }
+
     function testRouteShouldFailWithMinOutGreaterThanExpectedOut(uint8 tradeLen, uint256 inputAmount)
         public
         asUser(alice)
@@ -607,8 +616,13 @@ contract MinimaRouterV1Test is ExtendedDSTest {
         public
         asUser(alice)
     {
+        uint256 oldFee = minimaRouter.getPartnerFee(partnerId);
+
         if (feeNumerator > minimaRouter.MAX_PARTNER_FEE()) {
-            vm.expectRevert(bytes("MinimaRouter: Fee too high"));
+            vm.expectRevert(bytes("MinimaRouterV1: Fee too high"));
+            minimaRouter.setPartnerFee(partnerId, feeNumerator);
+        } else if (oldFee == feeNumerator){
+            vm.expectRevert(bytes("MinimaRouterV1: Old fee can not equal new fee!"));
             minimaRouter.setPartnerFee(partnerId, feeNumerator);
         } else {
             minimaRouter.setPartnerFee(partnerId, feeNumerator);
