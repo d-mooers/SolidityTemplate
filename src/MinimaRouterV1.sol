@@ -2,7 +2,7 @@
 pragma solidity 0.6.8;
 pragma experimental ABIEncoderV2;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./interfaces/ISwappaPairV1.sol";
 import "./interfaces/IMinimaRouterV1.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -255,13 +255,13 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
         );
 
         require(
-            ERC20(output).transfer(to, outputAmount),
+            IERC20(output).transfer(to, outputAmount),
             "MinimaRouter: Final transfer failed!"
         );
 
         if (
             partnerFee > 0 &&
-            !ERC20(output).transfer(partnerAdmin[partnerId], partnerFee)
+            !IERC20(output).transfer(partnerAdmin[partnerId], partnerFee)
         ) {
             revert("MinimaRouter: Partner fee transfer failed");
         }
@@ -272,7 +272,7 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
     }
 
     function updateBalances(address output) internal returns (uint256) {
-        outputBalancesBefore[output] = ERC20(output).balanceOf(address(this)); //Record the new fee balance
+        outputBalancesBefore[output] = IERC20(output).balanceOf(address(this)); //Record the new fee balance
     }
 
     // Here we assume divisors are sorted by token address
@@ -304,7 +304,7 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
 
             weightSumExpected = weightSumExpected.sub(weight);
 
-            uint256 swapResult = SafeMath.sub(ERC20(divisors[k].token).balanceOf(
+            uint256 swapResult = SafeMath.sub(IERC20(divisors[k].token).balanceOf(
                 address(this)
             ), outputBalancesBefore[divisors[k].token]);
 
@@ -365,7 +365,7 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
             //Transfer initial amounts
             if (details.inputAmounts[i] > 0) {
                 require(
-                    ERC20(details.path[i][0]).transferFrom(
+                    IERC20(details.path[i][0]).transferFrom(
                         msg.sender,
                         details.pairs[i][0],
                         details.inputAmounts[i]
@@ -400,7 +400,7 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
                     uint8 toIdx = details.divisors[i][k].toIdx;
                     require(completedPaths[toIdx] == false && toIdx != i, "MinimaRouterV1: Can not transfer to completed path!");
 
-                    ERC20(details.divisors[i][k].token).transfer(
+                    IERC20(details.divisors[i][k].token).transfer(
                         details.pairs[toIdx][0],
                         transferAmounts[k]
                     );
@@ -409,7 +409,7 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
             completedPaths[i] = true;
         }
 
-        uint256 tradeOutput = SafeMath.sub(ERC20(output).balanceOf(address(this)),
+        uint256 tradeOutput = SafeMath.sub(IERC20(output).balanceOf(address(this)),
             outputBalancesBefore[output]);
         uint256 partnerId = getPartnerInfo(
             details.partner,
