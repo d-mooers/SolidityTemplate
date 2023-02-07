@@ -110,7 +110,11 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
         outputBalancesBefore[token] = 0;
 
         uint256 toClaim = IERC20(token).balanceOf(address(this));
-        IERC20(token).transfer(reciever, toClaim);
+        require(
+            IERC20(token).transfer(reciever, toClaim),
+            "MinimaRouterV1: Admin fee transfer failed!"
+        );
+        
     }
 
     function splitSignature(bytes memory sig)
@@ -401,9 +405,12 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
                     uint8 toIdx = details.divisors[i][k].toIdx;
                     require(completedPaths[toIdx] == false && toIdx != i, "MinimaRouterV1: Can not transfer to completed path!");
 
-                    IERC20(details.divisors[i][k].token).transfer(
-                        details.pairs[toIdx][0],
-                        transferAmounts[k]
+                    require(
+                        IERC20(details.divisors[i][k].token).transfer(
+                            details.pairs[toIdx][0],
+                            transferAmounts[k]
+                        ),
+                        "MinimaRouterV1: Transfer to pair failed!"
                     );
                 }
             }
