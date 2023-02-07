@@ -351,6 +351,7 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
         bool[] memory completedPaths = new bool[](details.path.length);
 
         for (uint256 i = 0; i < details.path.length; i++) {
+            require(details.pairs[i].length == details.path[i].length - 1, "MinimaRouterV1: Inner path and pairs length mismatch!");
             //Transfer initial amounts
             if (details.inputAmounts[i] > 0) {
                 require(
