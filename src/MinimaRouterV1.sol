@@ -348,6 +348,8 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
             details.path[details.path.length - 1].length - 1
         ];
 
+        bool[] memory completedPaths = new bool[](details.path.length);
+
         for (uint256 i = 0; i < details.path.length; i++) {
             //Transfer initial amounts
             if (details.inputAmounts[i] > 0) {
@@ -384,12 +386,15 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
                 );
 
                 for (uint256 k; k < transferAmounts.length; k++) {
+                    uint8 toIdx = details.divisors[i][k].toIdx;
+                    require(completedPaths[toIdx] == false && toIdx != i, "MinimaRouterV1: Can not transfer to completed path!");
                     ERC20(details.divisors[i][k].token).transfer(
-                        details.pairs[details.divisors[i][k].toIdx][0],
+                        details.pairs[toIdx][0],
                         transferAmounts[k]
                     );
                 }
             }
+            completedPaths[i] = true;
         }
 
         uint256 tradeOutput = ERC20(output).balanceOf(address(this)) -
