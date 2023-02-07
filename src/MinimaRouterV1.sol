@@ -388,6 +388,7 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
                 for (uint256 k; k < transferAmounts.length; k++) {
                     uint8 toIdx = details.divisors[i][k].toIdx;
                     require(completedPaths[toIdx] == false && toIdx != i, "MinimaRouterV1: Can not transfer to completed path!");
+
                     ERC20(details.divisors[i][k].token).transfer(
                         details.pairs[toIdx][0],
                         transferAmounts[k]
@@ -424,6 +425,4 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
             partnerId
         );
     }
-
-    receive() external payable {}
 }

@@ -85,6 +85,4 @@ contract MinimaRouterV1NativeHandler is IMinimaRouterV1NativeHandler {
         INative(wrapperContract).withdraw(withdrawAmount);
         payable(msg.sender).transfer(withdrawAmount);
     }
-
-    receive() external payable {}
 }

@@ -54,6 +54,15 @@ contract MinimaRouterV1Test is ExtendedDSTest {
         vm.stopPrank();
     }
 
+    function testShouldFailOnRandomEthSend()
+        public
+        asUser(alice)
+    {
+        vm.deal(alice, 1 ether);
+        (bool sent, bytes memory _) = payable(address(minimaRouter)).call{value: 1 ether}("");
+        assertEq(sent, false);
+    }
+
     function testRouteShouldFailOnTransferToCurrentPath(uint8 tradeLen, uint256 inputAmount)
         public
         asUser(alice)
