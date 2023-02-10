@@ -102,6 +102,10 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
         }
     }
 
+    function renounceOwnership() public override onlyOwner{
+        revert("MinimaRouterV1: Ownership can't be renounced!");
+    }
+
     function transferOwnership(address newOwner) public override onlyOwner{
         partnerAdmin[0] = newOwner;
         super.transferOwnership(newOwner);

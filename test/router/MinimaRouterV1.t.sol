@@ -54,6 +54,19 @@ contract MinimaRouterV1Test is ExtendedDSTest {
         vm.stopPrank();
     }
 
+    function testRenounceOwnership()
+        public
+        asUser(alice)
+    {
+        address owner = minimaRouter.owner();
+        assertEq(owner, alice);
+
+        vm.expectRevert("MinimaRouterV1: Ownership can't be renounced!");
+        minimaRouter.renounceOwnership();
+        owner = minimaRouter.owner();
+        assertEq(owner, alice);
+    }
+
     function testTransferOwnership()
         public
         asUser(alice)
