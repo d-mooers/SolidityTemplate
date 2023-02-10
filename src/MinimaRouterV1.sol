@@ -239,12 +239,8 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
         bytes32 message = prefixed(
             keccak256(abi.encodePacked(partnerId, deadline, tokenIn, tokenOut))
         );
-        uint8 v;
-        bytes32 r;
-        bytes32 s;
-
-        (v, r, s) = splitSignature(sig);
-        address signer = ecrecover(message, v, r, s);
+       
+        address signer = recoverSigner(message, sig);
 
         // QSP-1: Check for null return from ecrecover and for admin rights of signer
         if (signer != address(0) && adminSigner[signer]) {
