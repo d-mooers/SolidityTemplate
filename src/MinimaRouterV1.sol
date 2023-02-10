@@ -61,6 +61,22 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
         uint256 newFee
     );
 
+    event AdminFeeRecovered(
+        address token,
+        address reciever,
+        uint256 amount
+    );
+
+    event AdminChanged(
+        address addr,
+        bool isAdmin
+    );
+
+    event PartnerAdminChanged(
+        uint256 partnerId,
+        address addr
+    );
+
     modifier ensure(uint256 deadline) {
         require(deadline >= block.timestamp, "MinimaRouterV1: Expired!");
         _;
@@ -147,7 +163,7 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
             IERC20(token).transfer(reciever, toClaim),
             "MinimaRouterV1: Admin fee transfer failed!"
         );
-        
+        emit AdminFeeRecovered(token, reciever, toClaim);
     }
 
     function splitSignature(bytes memory sig)
@@ -180,6 +196,7 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
     function setAdmin(address addr, bool isAdmin) external onlyOwner {
         require(addr != address(0), "MinimaRouterV1: Admin can not be 0 address!");
         adminSigner[addr] = isAdmin;
+        emit AdminChanged(addr, isAdmin);
     }
 
     function setPartnerAdmin(uint256 partnerId, address admin)
@@ -188,6 +205,7 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
     {
         require(admin != address(0), "MinimaRouterV1: Admin can not be 0 address!");
         partnerAdmin[partnerId] = admin;
+        emit PartnerAdminChanged(partnerId, admin);
     }
 
     function setPartnerFee(uint256 partnerId, uint256 feeNumerator)

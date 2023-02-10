@@ -20,6 +20,22 @@ import {ExtendedDSTest} from "../utils/ExtendedDSTest.sol";
     Dependency: None
 */
 contract MinimaRouterV1Test is ExtendedDSTest {
+    event AdminFeeRecovered(
+        address token,
+        address reciever,
+        uint256 amount
+    );
+
+    event AdminChanged(
+        address addr,
+        bool isAdmin
+    );
+
+    event PartnerAdminChanged(
+        uint256 partnerId,
+        address addr
+    );
+
     uint256 constant NUM_TOKENS = 255;
 
     MinimaRouterV1 public minimaRouter;
@@ -59,6 +75,33 @@ contract MinimaRouterV1Test is ExtendedDSTest {
         vm.startPrank(_addr);
         _;
         vm.stopPrank();
+    }
+
+    function testPartnerAdminChanged()
+        public
+        asUser(alice)
+    {
+         vm.expectEmit(true, false, false, true);
+         emit PartnerAdminChanged(10, address(3));
+         minimaRouter.setPartnerAdmin(10, address(3));
+    }
+
+    function testAdminChangedEvent()
+        public
+        asUser(alice)
+    {
+        vm.expectEmit(true, false, false, true);
+        emit AdminChanged(address(3), true);
+        minimaRouter.setAdmin(address(3), true);
+    }
+
+    function testRecoverAdminFeeEvent()
+        public
+        asUser(alice)
+    {
+        vm.expectEmit(true, true, false, true);
+        emit AdminFeeRecovered(address(tokens[0]), alice, 0);
+        minimaRouter.recoverAdminFee(address(tokens[0]), alice);
     }
 
     function testAdminIsContract()
