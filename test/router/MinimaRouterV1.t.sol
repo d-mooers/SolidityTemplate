@@ -672,7 +672,7 @@ contract MinimaRouterV1Test is ExtendedDSTest {
         minimaRouterExternal.getDivisorTransferAmounts__External(divisors);
     }
 
-    function testGetPartnerInfoReturns0OnInvalidEcRecover() public {
+    function testgetPartnerIdFromSigReturns0OnInvalidEcRecover() public {
         uint256 partnerId = 9;
         uint256 deadline = block.timestamp + 1000;
         address tokenIn = address(tokens[0]);
@@ -702,7 +702,7 @@ contract MinimaRouterV1Test is ExtendedDSTest {
 
         assertEq(expectedSigner, address(0));
 
-        uint256 partnerInfo = minimaRouterExternal.getPartnerInfo__External(
+        uint256 partnerInfo = minimaRouterExternal.getPartnerIdFromSig__External(
             partnerId,
             deadline,
             tokenIn,

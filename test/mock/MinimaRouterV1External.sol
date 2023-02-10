@@ -41,14 +41,14 @@ contract MinimaRouterV1External is MinimaRouterV1 {
         return recoverSigner(hash, sig);
     }
 
-    function getPartnerInfo__External(
+    function getPartnerIdFromSig__External(
         uint256 partnerId,
         uint256 deadline,
         address tokenIn,
         address tokenOut,
         bytes calldata sig
     ) external view returns (uint256) {
-        return getPartnerInfo(partnerId, deadline, tokenIn, tokenOut, sig);
+        return getPartnerIdFromSig(partnerId, deadline, tokenIn, tokenOut, sig);
     }
 
     function disperseWithFee__External(

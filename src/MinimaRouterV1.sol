@@ -8,8 +8,6 @@ import "./interfaces/IMinimaRouterV1.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
-import "./interfaces/IFarm.sol";
-import "./interfaces/INative.sol";
 
 contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
     using SafeMath for uint256;
@@ -18,7 +16,7 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
     mapping(address => bool) private adminSigner;
 
     // Tracks fees for partners.  Fee is calculated as fee / FEE_DENOMINATOR
-    mapping(uint256 => uint256) private partnerFees;
+    mapping(uint256 => uint256) private partnerFeesNumerator;
 
     // Tracks wallets that can control fee for a given partner
     mapping(uint256 => address) private partnerAdmin;
@@ -39,16 +37,6 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
         address indexed input,
         address output,
         uint256 inputAmount,
-        uint256 outputAmount,
-        uint256 indexed tenantId
-    );
-
-    event MultiSwap(
-        address indexed sender,
-        address to,
-        address input,
-        address output,
-        uint256[] inputAmounts,
         uint256 outputAmount,
         uint256 indexed tenantId
     );
@@ -76,11 +64,6 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
         uint256 partnerId,
         address addr
     );
-
-    modifier ensure(uint256 deadline) {
-        require(deadline >= block.timestamp, "MinimaRouterV1: Expired!");
-        _;
-    }
 
     modifier partnerAuthorized(uint256 partnerId) {
         require(
@@ -131,9 +114,8 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
         require(isContract(admin), "MinimaRouterV1: Minima must be deployed from contract!");
         transferOwnership(admin);
 
-        // Make the null tenant the admin wallet
+        // Make the null tenant the admin wallet, with default fee numerator of 0
         partnerAdmin[0] = admin;
-        partnerFees[0] = 0;
 
         // Add the initial signers
         for (uint8 i = 0; i < initialSigners.length; i++) {
@@ -213,9 +195,9 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
         partnerAuthorized(partnerId)
     {
         require(feeNumerator <= MAX_PARTNER_FEE, "MinimaRouterV1: Fee too high");
-        uint256 oldFee = partnerFees[partnerId];    
+        uint256 oldFee = partnerFeesNumerator[partnerId];    
         require(oldFee != feeNumerator, "MinimaRouterV1: Old fee can not equal new fee!");
-        partnerFees[partnerId] = feeNumerator;
+        partnerFeesNumerator[partnerId] = feeNumerator;
         emit FeeChanged(partnerId, msg.sender, false, oldFee, feeNumerator);
     }
 
@@ -242,10 +224,10 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
     }
 
     function getPartnerFee(uint256 partnerId) external view returns (uint256) {
-        return partnerFees[partnerId];
+        return partnerFeesNumerator[partnerId];
     }
 
-    function getPartnerInfo(
+    function getPartnerIdFromSig(
         uint256 partnerId,
         uint256 deadline,
         address tokenIn,
@@ -290,14 +272,14 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
 
     // Disperse the output amount to the recipient, taking into account the partner fee and positive slippage.
     function disperseWithFee(
-        address output,
+        address outputToken,
         uint256 minOutputAmount,
         uint256 expectedOutput,
         uint256 outputAmount,
         address to,
         uint256 partnerId
     ) internal returns (uint256) {
-        uint256 partnerFee = outputAmount.mul(partnerFees[partnerId]).div(
+        uint256 partnerFee = outputAmount.mul(partnerFeesNumerator[partnerId]).div(
             FEE_DENOMINATOR
         );
         outputAmount = outputAmount.sub(partnerFee);
@@ -311,19 +293,19 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
         );
 
         require(
-            IERC20(output).transfer(to, outputAmount),
+            IERC20(outputToken).transfer(to, outputAmount),
             "MinimaRouter: Final transfer failed!"
         );
 
         if (
             partnerFee > 0 &&
-            !IERC20(output).transfer(partnerAdmin[partnerId], partnerFee)
+            !IERC20(outputToken).transfer(partnerAdmin[partnerId], partnerFee)
         ) {
             revert("MinimaRouter: Partner fee transfer failed");
         }
 
         // Record internal balance
-        updateBalances(output);
+        updateBalances(outputToken);
         return outputAmount;
     }
 
@@ -381,7 +363,7 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
         returns (uint256[] memory)
     {
         require(
-            details.deadline >= block.timestamp,
+            details.deadline >= block.timestamp, 
             "MinimaRouterV1: Expired!"
         );
         require(
@@ -456,13 +438,15 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
                     uint8 toIdx = details.divisors[i][k].toIdx;
                     require(completedPaths[toIdx] == false && toIdx != i, "MinimaRouterV1: Can not transfer to completed path!");
 
-                    require(
-                        IERC20(details.divisors[i][k].token).transfer(
-                            details.pairs[toIdx][0],
-                            transferAmounts[k]
-                        ),
-                        "MinimaRouterV1: Transfer to pair failed!"
-                    );
+                    if(transferAmounts[k] > 0){
+                        require(
+                            IERC20(details.divisors[i][k].token).transfer(
+                                details.pairs[toIdx][0],
+                                transferAmounts[k]
+                            ),
+                            "MinimaRouterV1: Transfer to pair failed!"
+                        );
+                    }
                 }
             }
             completedPaths[i] = true;
@@ -470,7 +454,7 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
 
         uint256 tradeOutput = SafeMath.sub(IERC20(output).balanceOf(address(this)),
             outputBalancesBefore[output]);
-        uint256 partnerId = getPartnerInfo(
+        uint256 partnerId = getPartnerIdFromSig(
             details.partner,
             details.deadline,
             details.path[0][0],
