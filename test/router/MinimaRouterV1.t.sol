@@ -9,6 +9,7 @@ import {Test} from "forge-std/Test.sol";
 import {MinimaRouterV1} from "../../src/MinimaRouterV1.sol";
 import {IMinimaRouterV1} from "../../src/interfaces/IMinimaRouterV1.sol";
 import {MockPair} from "../mock/MockPair.sol";
+import {MockMultisig} from "../mock/MockMultisig.sol";
 import {MinimaRouterV1External} from "../mock/MinimaRouterV1External.sol";
 
 import "forge-std/console.sol";
@@ -23,6 +24,7 @@ contract MinimaRouterV1Test is ExtendedDSTest {
 
     MinimaRouterV1 public minimaRouter;
     MockPair public pair;
+    MockMultisig public multisig;
     MinimaRouterV1External public minimaRouterExternal;
 
     MockErc20[NUM_TOKENS] public tokens;
@@ -30,10 +32,15 @@ contract MinimaRouterV1Test is ExtendedDSTest {
     function setUp() public override {
         ExtendedDSTest.setUp();
 
+        multisig = new MockMultisig();
+
         address[] memory adminSigners = new address[](1);
         adminSigners[0] = alice;
-        minimaRouter = new MinimaRouterV1(alice, adminSigners);
-        minimaRouterExternal = new MinimaRouterV1External(alice, adminSigners);
+        minimaRouter = new MinimaRouterV1(address(multisig), adminSigners);
+        minimaRouterExternal = new MinimaRouterV1External(address(multisig), adminSigners);
+
+        multisig.transferMinima(minimaRouter, alice); //current intended behavior is to allow for transfer to EOA later. I'm taking advtage of that for testing.
+        multisig.transferMinima(minimaRouterExternal, alice);
 
         pair = new MockPair();
 
@@ -52,6 +59,19 @@ contract MinimaRouterV1Test is ExtendedDSTest {
         vm.startPrank(_addr);
         _;
         vm.stopPrank();
+    }
+
+    function testAdminIsContract()
+        public
+        asUser(alice)
+    {
+        address[] memory adminSigners = new address[](1);
+        adminSigners[0] = address(1);
+        
+        vm.expectRevert("MinimaRouterV1: Minima must be deployed from contract!");
+        MinimaRouterV1 testRouter = new MinimaRouterV1(alice, adminSigners);
+
+        testRouter = new MinimaRouterV1(address(multisig), adminSigners);
     }
 
     function testRenounceOwnership()
@@ -73,7 +93,9 @@ contract MinimaRouterV1Test is ExtendedDSTest {
     {
         address[] memory adminSigners = new address[](1);
         adminSigners[0] = address(1);
-        MinimaRouterV1 testRouter = new MinimaRouterV1(alice, adminSigners);
+        MinimaRouterV1 testRouter = new MinimaRouterV1(address(multisig), adminSigners);
+        multisig.transferMinima(testRouter, alice); //current intended behavior is to allow for transfer to EOA later. I'm taking advtage of that for testing.
+
 
         vm.expectRevert("Ownable: new owner is the zero address");
         testRouter.transferOwnership(address(0));
@@ -256,7 +278,7 @@ contract MinimaRouterV1Test is ExtendedDSTest {
         address[] memory adminSigners = new address[](1);
         adminSigners[0] = address(0);
         vm.expectRevert(bytes("MinimaRouterV1: Initial signers can not be 0 address!"));
-        new MinimaRouterV1(alice, adminSigners);
+        new MinimaRouterV1(address(multisig), adminSigners);
     }
 
     function testShouldFailWithAdminAs0Address()

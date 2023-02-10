@@ -7,6 +7,7 @@ import "./interfaces/ISwappaPairV1.sol";
 import "./interfaces/IMinimaRouterV1.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
 import "./interfaces/IFarm.sol";
 import "./interfaces/INative.sol";
 
@@ -82,6 +83,28 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
     }
 
     /**
+     * [IMPORTANT]
+     * It is unsafe to assume that an address for which this function returns
+     * false is an externally-owned account (EOA) and not a contract.
+     * Among others, `isContract` will return false for the following
+     * types of addresses:
+     *  - an externally-owned account
+     *  - a contract in construction
+     *  - an address where a contract will be created
+     *  - an address where a contract lived, but was destroyed
+     */
+    function isContract(address account) internal view returns (bool) {
+        // This method relies in extcodesize, which returns 0 for contracts in
+        // construction, since the code is only stored at the end of the
+        // constructor execution.
+
+        uint256 size;
+        // solhint-disable-next-line no-inline-assembly
+        assembly { size := extcodesize(account) }
+        return size > 0;
+    }
+
+    /**
 		admin should be a multisig wallet
 	 */
     constructor(address admin, address[] memory initialSigners)
@@ -89,6 +112,7 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
         Ownable()
     {
         require(admin != address(0), "MinimaRouterV1: Admin can not be 0 address!");
+        require(isContract(admin), "MinimaRouterV1: Minima must be deployed from contract!");
         transferOwnership(admin);
 
         // Make the null tenant the admin wallet
