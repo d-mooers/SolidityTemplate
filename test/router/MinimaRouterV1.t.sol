@@ -54,6 +54,26 @@ contract MinimaRouterV1Test is ExtendedDSTest {
         vm.stopPrank();
     }
 
+    function testTransferOwnership()
+        public
+        asUser(alice)
+    {
+        address[] memory adminSigners = new address[](1);
+        adminSigners[0] = address(1);
+        MinimaRouterV1 testRouter = new MinimaRouterV1(alice, adminSigners);
+
+        testRouter.recoverAdminFee(address(tokens[0]), alice);
+        address owner = testRouter.owner();
+        assertEq(owner, alice);
+
+        testRouter.transferOwnership(bob);
+        owner = testRouter.owner();
+        assertEq(owner, bob);
+
+        vm.expectRevert("Unauthorized");
+        testRouter.recoverAdminFee(address(tokens[0]), alice);
+    }
+
     function testSetPartnerFeeSameAsOld()
         public
         asUser(alice)

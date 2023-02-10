@@ -102,6 +102,11 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
         }
     }
 
+    function transferOwnership(address newOwner) public override onlyOwner{
+        partnerAdmin[0] = newOwner;
+        super.transferOwnership(newOwner);
+    }
+
     function recoverAdminFee(address token, address reciever)
         external
         onlyAdmin
