@@ -75,6 +75,9 @@ contract MinimaRouterV1Test is ExtendedDSTest {
         adminSigners[0] = address(1);
         MinimaRouterV1 testRouter = new MinimaRouterV1(alice, adminSigners);
 
+        vm.expectRevert("Ownable: new owner is the zero address");
+        testRouter.transferOwnership(address(0));
+
         testRouter.recoverAdminFee(address(tokens[0]), alice);
         address owner = testRouter.owner();
         assertEq(owner, alice);
