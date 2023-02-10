@@ -2,6 +2,8 @@ pragma solidity 0.6.8;
 pragma experimental ABIEncoderV2;
 
 import {MockErc20} from "../mock/MockErc20.sol";
+import {MockFailingErc20} from "../mock/MockFailingErc20.sol";
+
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 import {Test} from "forge-std/Test.sol";
@@ -75,6 +77,96 @@ contract MinimaRouterV1Test is ExtendedDSTest {
         vm.startPrank(_addr);
         _;
         vm.stopPrank();
+    }
+
+    function testSwapTransferFailBetweenRoutes(uint8 tradeLen)
+        public
+        asUser(alice)
+    {
+        uint256 inputAmount = 1000000;
+        MockFailingErc20 badToken = new MockFailingErc20("BAD", "BAD");
+        tokens[0].mint(alice, inputAmount);
+
+        if (tradeLen < 4 || inputAmount == 0) {
+            return;
+        }
+
+        address[][] memory path = new address[][](2);
+        address[][] memory pairs = new address[][](2);
+        bytes[][] memory extras = new bytes[][](2);
+
+        uint256[] memory inputAmounts = new uint256[](2); //new uint256[](1);
+
+        IMinimaRouterV1.Divisor[][]
+            memory divisors = new IMinimaRouterV1.Divisor[][](1);
+
+        MockErc20 inputToken = tokens[0];
+
+        path[0] = new address[](2);
+        pairs[0] = new address[](1);
+        extras[0] = new bytes[](1);
+        inputAmounts[0] = inputAmount;
+        path[0][0] = address(tokens[0]);
+        path[0][1] = address(badToken);
+        pairs[0][0] = address(pair);
+        extras[0][0] = new bytes(0);
+        divisors[0] = new IMinimaRouterV1.Divisor[](1);
+        divisors[0][0] = IMinimaRouterV1.Divisor({
+            toIdx: 1,
+            divisor: 100,
+            token: address(badToken)
+        });
+
+        path[1] = new address[](tradeLen - tradeLen / 2);
+        pairs[1] = new address[]((tradeLen - tradeLen / 2) - 1);
+        extras[1] = new bytes[]((tradeLen - tradeLen / 2) - 1);
+        for (uint8 i = 0; i < tradeLen - tradeLen / 2; i++) {
+            path[1][i] = address(tokens[i + tradeLen / 2]);
+
+            if (i > 0) {
+                pairs[1][i - 1] = address(pair);
+                extras[1][i - 1] = new bytes(0);
+            }
+        }
+
+        IMinimaRouterV1.MultiSwapPayload memory payload = IMinimaRouterV1
+            .MultiSwapPayload({
+                path: path,
+                pairs: pairs,
+                extras: extras,
+                divisors: divisors,
+                inputAmounts: inputAmounts,
+                minOutputAmount: inputAmount,
+                expectedOutputAmount: inputAmount,
+                to: alice,
+                deadline: block.timestamp + 10,
+                partner: 0,
+                sig: new bytes(0)
+            });
+
+        inputToken.approve(address(minimaRouter), inputAmount);
+
+        vm.expectRevert(bytes("MinimaRouterV1: Transfer to pair failed!"));
+        minimaRouter.swapExactInputForOutput(payload);
+    }
+
+    function testDisperseWFeesTransferFail()
+        public
+        asUser(alice)
+    {
+        MockFailingErc20 badToken = new MockFailingErc20("BAD", "BAD");
+        badToken.mint(address(minimaRouterExternal), 100000000000);
+        vm.expectRevert(bytes("MinimaRouter: Final transfer failed!"));
+        minimaRouterExternal.disperseWithFee__External(address(badToken), 0, 1, 2, alice, 0);
+    }
+
+    function testRecoverAdminFeeTransferFail()
+        public
+        asUser(alice)
+    {
+        MockFailingErc20 badToken = new MockFailingErc20("BAD", "BAD");
+        vm.expectRevert(bytes("MinimaRouterV1: Admin fee transfer failed!"));
+        minimaRouter.recoverAdminFee(address(badToken), alice);
     }
 
     function testPartnerAdminChanged()

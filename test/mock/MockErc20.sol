@@ -12,7 +12,7 @@ contract MockErc20 is ERC20 {
         _mint(account, amount);
     }
 
-    function freeTransfer(address account, uint256 amount) external {
+    function freeTransfer(address account, uint256 amount) external virtual{
         _mint(account, amount);
     }
 
