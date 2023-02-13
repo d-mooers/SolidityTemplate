@@ -255,7 +255,7 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
         uint256 inputAmount
     ) external view override returns (uint256 outputAmount) {
         outputAmount = inputAmount;
-        for (uint256 i; i < pairs.length; i++) {
+        for (uint256 i=0; i < pairs.length; i++) {
             outputAmount = ISwappaPairV1(pairs[i]).getOutputAmount(
                 path[i],
                 path[i + 1],
@@ -326,7 +326,7 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
         }
 
         uint256[] memory transferAmounts = new uint256[](divisors.length);
-        for (uint256 k; k < divisors.length; k++) {
+        for (uint256 k=0; k < divisors.length; k++) {
             uint8 weight = divisors[k].divisor;
             require(weight <= 100, "MinimaRouter: Divisor too high");
             require(weight > 0, "MinimaRouter: Divisor too low");
@@ -407,7 +407,7 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
                 );
             }
 
-            for (uint256 j; j < details.pairs[i].length; j++) {
+            for (uint256 j=0; j < details.pairs[i].length; j++) {
                 (address pairInput, address pairOutput) = (
                     details.path[i][j],
                     details.path[i][j + 1]
@@ -429,7 +429,7 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
                     details.divisors[i]
                 );
 
-                for (uint256 k; k < transferAmounts.length; k++) {
+                for (uint256 k=0; k < transferAmounts.length; k++) {
                     uint8 toIdx = details.divisors[i][k].toIdx;
                     require(completedPaths[toIdx] == false && toIdx != i, "MinimaRouterV1: Can not transfer to completed path!");
 
