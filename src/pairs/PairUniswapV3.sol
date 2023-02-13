@@ -10,7 +10,7 @@ import "../interfaces/uniswap/Quoter.sol";
 import "../interfaces/uniswap/SafeCast.sol";
 import "../interfaces/uniswap/TickLens.sol";
 import "../interfaces/uniswap/TickMath.sol";
-import "../interfaces/ISwappaPairV1.sol";
+import "../interfaces/ISwappaPairV16.sol";
 
 contract PairUniswapV3 is ISwappaPairV1, IUniswapV3SwapCallback {
     using SafeMath for uint256;

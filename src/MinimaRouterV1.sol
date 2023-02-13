@@ -2,7 +2,7 @@
 pragma solidity 0.8.18;
 
 import "@openzeppelin08/contracts/token/ERC20/IERC20.sol";
-import "./interfaces/ISwappaPairV18.sol";
+import "./interfaces/ISwappaPairV1.sol";
 import "./interfaces/IMinimaRouterV1.sol";
 import "@openzeppelin08/contracts/access/Ownable.sol";
 import "@openzeppelin08/contracts/utils/math/SafeMath.sol";

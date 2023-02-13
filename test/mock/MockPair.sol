@@ -1,6 +1,6 @@
 pragma solidity 0.8.18;
 
-import {ISwappaPairV1} from "../../src/interfaces/ISwappaPairV18.sol";
+import {ISwappaPairV1} from "../../src/interfaces/ISwappaPairV1.sol";
 import {MockErc20} from "./MockErc20.sol";
 import "forge-std/console.sol";
 

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.6.4;
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+pragma solidity 0.8.18;
+import "@openzeppelin08/contracts/token/ERC20/IERC20.sol";
 
 interface ILiquidityGaugeV3 is IERC20 {
     function deposit(uint256 value, address recipient) external;

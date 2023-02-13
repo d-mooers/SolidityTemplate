@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.6.8;
+pragma solidity 0.8.18;
 
-import "@openzeppelin/contracts/math/SafeMath.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin08/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin08/contracts/token/ERC20/ERC20.sol";
 import "../interfaces/curve/ICurve.sol";
 import "../interfaces/ISwappaPairV1.sol";
 
@@ -81,10 +81,10 @@ contract PairCurve is ISwappaPairV1 {
             }
             address coin = swapPool.coins(idx);
             if (coin == input) {
-                fromIdx = idx;
+                fromIdx = int8(idx);
             }
             if (coin == output) {
-                toIdx = idx;
+                toIdx = int8(idx);
             }
         }
     }
