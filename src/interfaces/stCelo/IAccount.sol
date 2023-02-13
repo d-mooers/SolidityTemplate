@@ -1,4 +1,4 @@
-pragma solidity 0.6.8;
+pragma solidity 0.8.18;
 
 interface IAccount {
     function getTotalCelo() external view returns (uint256);
