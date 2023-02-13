@@ -1,4 +1,4 @@
-pragma solidity 0.6.8;
+pragma solidity 0.8.18;
 
 interface IExchange {
   function buy(uint256, uint256, bool) external returns (uint256);

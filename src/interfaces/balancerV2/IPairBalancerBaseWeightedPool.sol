@@ -1,5 +1,4 @@
-pragma solidity 0.6.8;
-pragma experimental ABIEncoderV2;
+pragma solidity 0.8.18;
 
 interface IPairBalancerBaseWeightedPool {
     function getNormalizedWeights() external view returns (uint256[] memory);
