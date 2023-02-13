@@ -1,10 +1,13 @@
 pragma solidity 0.8.18;
 
-import "@openzeppelin08/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 interface IPairBalancerWeightedVault {
-
-    event PoolRegistered(bytes32 indexed poolId, address indexed poolAddress, PoolSpecialization specialization);
+    event PoolRegistered(
+        bytes32 indexed poolId,
+        address indexed poolAddress,
+        PoolSpecialization specialization
+    );
 
     // Pools
     //
@@ -23,9 +26,16 @@ interface IPairBalancerWeightedVault {
     //  - Two Token: only allows two tokens to be registered. This achieves the lowest possible swap gas cost. Like
     // minimal swap info Pools, these are called via IMinimalSwapInfoPool.
 
-    enum PoolSpecialization { GENERAL, MINIMAL_SWAP_INFO, TWO_TOKEN }
+    enum PoolSpecialization {
+        GENERAL,
+        MINIMAL_SWAP_INFO,
+        TWO_TOKEN
+    }
 
-    enum SwapKind { GIVEN_IN, GIVEN_OUT }
+    enum SwapKind {
+        GIVEN_IN,
+        GIVEN_OUT
+    }
 
     /**
      * @dev Data for a single swap executed by `swap`. `amount` is either `amountIn` or `amountOut` depending on
@@ -124,17 +134,17 @@ interface IPairBalancerWeightedVault {
     /**
      * @dev Returns a Pool's contract address and specialization setting.
      */
-    function getPool(bytes32 poolId) external view returns (address, PoolSpecialization);
+    function getPool(bytes32 poolId)
+        external
+        view
+        returns (address, PoolSpecialization);
 
-	function swap(
-		SingleSwap calldata singleSwap,
+    function swap(
+        SingleSwap calldata singleSwap,
         FundManagement calldata funds,
         uint256 limit,
         uint256 deadline
-	) 
-    external 
-    payable
-    returns (uint256);
+    ) external payable returns (uint256);
 
     /**
      * @dev Called by users to join a Pool, which transfers tokens from `sender` into the Pool's balance. This will

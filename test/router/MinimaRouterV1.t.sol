@@ -3,7 +3,7 @@ pragma solidity 0.8.18;
 import {MockErc20} from "../mock/MockErc20.sol";
 import {MockFailingErc20} from "../mock/MockFailingErc20.sol";
 
-import {Strings} from "@openzeppelin08/contracts/utils/Strings.sol";
+import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 import {Test} from "forge-std/Test.sol";
 
@@ -21,21 +21,11 @@ import {ExtendedDSTest} from "../utils/ExtendedDSTest.sol";
     Dependency: None
 */
 contract MinimaRouterV1Test is ExtendedDSTest {
-    event AdminFeeRecovered(
-        address token,
-        address reciever,
-        uint256 amount
-    );
+    event AdminFeeRecovered(address token, address reciever, uint256 amount);
 
-    event AdminChanged(
-        address addr,
-        bool isAdmin
-    );
+    event AdminChanged(address addr, bool isAdmin);
 
-    event PartnerAdminChanged(
-        uint256 partnerId,
-        address addr
-    );
+    event PartnerAdminChanged(uint256 partnerId, address addr);
 
     uint256 constant NUM_TOKENS = 255;
 
@@ -54,7 +44,10 @@ contract MinimaRouterV1Test is ExtendedDSTest {
         address[] memory adminSigners = new address[](1);
         adminSigners[0] = alice;
         minimaRouter = new MinimaRouterV1(address(multisig), adminSigners);
-        minimaRouterExternal = new MinimaRouterV1External(address(multisig), adminSigners);
+        minimaRouterExternal = new MinimaRouterV1External(
+            address(multisig),
+            adminSigners
+        );
 
         multisig.transferMinima(minimaRouter, alice); //current intended behavior is to allow for transfer to EOA later. I'm taking advtage of that for testing.
         multisig.transferMinima(minimaRouterExternal, alice);
@@ -149,69 +142,57 @@ contract MinimaRouterV1Test is ExtendedDSTest {
         minimaRouter.swapExactInputForOutput(payload);
     }
 
-    function testDisperseWFeesTransferFail()
-        public
-        asUser(alice)
-    {
+    function testDisperseWFeesTransferFail() public asUser(alice) {
         MockFailingErc20 badToken = new MockFailingErc20("BAD", "BAD");
         badToken.mint(address(minimaRouterExternal), 100000000000);
         vm.expectRevert(bytes("MinimaRouter: Final transfer failed!"));
-        minimaRouterExternal.disperseWithFee__External(address(badToken), 0, 1, 2, alice, 0);
+        minimaRouterExternal.disperseWithFee__External(
+            address(badToken),
+            0,
+            1,
+            2,
+            alice,
+            0
+        );
     }
 
-    function testRecoverAdminFeeTransferFail()
-        public
-        asUser(alice)
-    {
+    function testRecoverAdminFeeTransferFail() public asUser(alice) {
         MockFailingErc20 badToken = new MockFailingErc20("BAD", "BAD");
         vm.expectRevert(bytes("MinimaRouterV1: Admin fee transfer failed!"));
         minimaRouter.recoverAdminFee(address(badToken), alice);
     }
 
-    function testPartnerAdminChanged()
-        public
-        asUser(alice)
-    {
-         vm.expectEmit(true, false, false, true);
-         emit PartnerAdminChanged(10, address(3));
-         minimaRouter.setPartnerAdmin(10, address(3));
+    function testPartnerAdminChanged() public asUser(alice) {
+        vm.expectEmit(true, false, false, true);
+        emit PartnerAdminChanged(10, address(3));
+        minimaRouter.setPartnerAdmin(10, address(3));
     }
 
-    function testAdminChangedEvent()
-        public
-        asUser(alice)
-    {
+    function testAdminChangedEvent() public asUser(alice) {
         vm.expectEmit(true, false, false, true);
         emit AdminChanged(address(3), true);
         minimaRouter.setAdmin(address(3), true);
     }
 
-    function testRecoverAdminFeeEvent()
-        public
-        asUser(alice)
-    {
+    function testRecoverAdminFeeEvent() public asUser(alice) {
         vm.expectEmit(true, true, false, true);
         emit AdminFeeRecovered(address(tokens[0]), alice, 0);
         minimaRouter.recoverAdminFee(address(tokens[0]), alice);
     }
 
-    function testAdminIsContract()
-        public
-        asUser(alice)
-    {
+    function testAdminIsContract() public asUser(alice) {
         address[] memory adminSigners = new address[](1);
         adminSigners[0] = address(1);
-        
-        vm.expectRevert("MinimaRouterV1: Minima must be deployed from contract!");
+
+        vm.expectRevert(
+            "MinimaRouterV1: Minima must be deployed from contract!"
+        );
         MinimaRouterV1 testRouter = new MinimaRouterV1(alice, adminSigners);
 
         testRouter = new MinimaRouterV1(address(multisig), adminSigners);
     }
 
-    function testRenounceOwnership()
-        public
-        asUser(alice)
-    {
+    function testRenounceOwnership() public asUser(alice) {
         address owner = minimaRouter.owner();
         assertEq(owner, alice);
 
@@ -221,15 +202,14 @@ contract MinimaRouterV1Test is ExtendedDSTest {
         assertEq(owner, alice);
     }
 
-    function testTransferOwnership()
-        public
-        asUser(alice)
-    {
+    function testTransferOwnership() public asUser(alice) {
         address[] memory adminSigners = new address[](1);
         adminSigners[0] = address(1);
-        MinimaRouterV1 testRouter = new MinimaRouterV1(address(multisig), adminSigners);
+        MinimaRouterV1 testRouter = new MinimaRouterV1(
+            address(multisig),
+            adminSigners
+        );
         multisig.transferMinima(testRouter, alice); //current intended behavior is to allow for transfer to EOA later. I'm taking advtage of that for testing.
-
 
         vm.expectRevert("Ownable: new owner is the zero address");
         testRouter.transferOwnership(address(0));
@@ -246,19 +226,18 @@ contract MinimaRouterV1Test is ExtendedDSTest {
         testRouter.recoverAdminFee(address(tokens[0]), alice);
     }
 
-    function testSetPartnerFeeSameAsOld()
-        public
-        asUser(alice)
-    {
+    function testSetPartnerFeeSameAsOld() public asUser(alice) {
         minimaRouter.setPartnerFee(10, 5000);
-        vm.expectRevert(bytes("MinimaRouterV1: Old fee can not equal new fee!"));
-        minimaRouter.setPartnerFee(10, 5000);   
+        vm.expectRevert(
+            bytes("MinimaRouterV1: Old fee can not equal new fee!")
+        );
+        minimaRouter.setPartnerFee(10, 5000);
     }
 
-    function testRouteShouldFailWithMinOutGreaterThanExpectedOut(uint8 tradeLen, uint256 inputAmount)
-        public
-        asUser(alice)
-    {
+    function testRouteShouldFailWithMinOutGreaterThanExpectedOut(
+        uint8 tradeLen,
+        uint256 inputAmount
+    ) public asUser(alice) {
         if (tradeLen < 4 || inputAmount == 0) {
             return;
         }
@@ -327,15 +306,18 @@ contract MinimaRouterV1Test is ExtendedDSTest {
             });
 
         inputToken.approve(address(minimaRouter), inputAmount);
-        vm.expectRevert(bytes("MinimaRouterV1: expectedOutputAmount should be >= minOutputAmount"));
+        vm.expectRevert(
+            bytes(
+                "MinimaRouterV1: expectedOutputAmount should be >= minOutputAmount"
+            )
+        );
         minimaRouter.swapExactInputForOutput(payload);
-
     }
 
-    function testRouteShouldFailWithPairLenEq0(uint8 tradeLen, uint256 inputAmount)
-        public
-        asUser(alice)
-    {
+    function testRouteShouldFailWithPairLenEq0(
+        uint8 tradeLen,
+        uint256 inputAmount
+    ) public asUser(alice) {
         if (tradeLen < 4 || inputAmount == 0) {
             return;
         }
@@ -386,7 +368,9 @@ contract MinimaRouterV1Test is ExtendedDSTest {
             });
 
         inputToken.approve(address(minimaRouter), inputAmount);
-        vm.expectRevert(bytes("MinimaRouterV1: Inner pairs length can not be 0!"));
+        vm.expectRevert(
+            bytes("MinimaRouterV1: Inner pairs length can not be 0!")
+        );
         minimaRouter.swapExactInputForOutput(payload);
     }
 
@@ -398,26 +382,21 @@ contract MinimaRouterV1Test is ExtendedDSTest {
         minimaRouter.setPartnerAdmin(0, address(0));
     }
 
-    function testShouldFailWithSetAdminAs0Address()
-        public
-        asUser(alice)
-    {
+    function testShouldFailWithSetAdminAs0Address() public asUser(alice) {
         vm.expectRevert(bytes("MinimaRouterV1: Admin can not be 0 address!"));
         minimaRouter.setAdmin(address(0), true);
     }
 
-    function testShouldFailWithInitialSignersAs0Address()
-        public
-    {
+    function testShouldFailWithInitialSignersAs0Address() public {
         address[] memory adminSigners = new address[](1);
         adminSigners[0] = address(0);
-        vm.expectRevert(bytes("MinimaRouterV1: Initial signers can not be 0 address!"));
+        vm.expectRevert(
+            bytes("MinimaRouterV1: Initial signers can not be 0 address!")
+        );
         new MinimaRouterV1(address(multisig), adminSigners);
     }
 
-    function testShouldFailWithAdminAs0Address()
-        public
-    {
+    function testShouldFailWithAdminAs0Address() public {
         address[] memory adminSigners = new address[](1);
         adminSigners[0] = alice;
         vm.expectRevert(bytes("MinimaRouterV1: Admin can not be 0 address!"));
@@ -428,14 +407,16 @@ contract MinimaRouterV1Test is ExtendedDSTest {
         public
         asUser(alice)
     {
-        vm.expectRevert(bytes("MinimaRouterV1: Reciever can not be 0 address!"));
+        vm.expectRevert(
+            bytes("MinimaRouterV1: Reciever can not be 0 address!")
+        );
         minimaRouter.recoverAdminFee(address(tokens[0]), address(0));
     }
 
-    function testRouteShouldFailWithPathPairsMismatch(uint8 tradeLen, uint256 inputAmount)
-        public
-        asUser(alice)
-    {
+    function testRouteShouldFailWithPathPairsMismatch(
+        uint8 tradeLen,
+        uint256 inputAmount
+    ) public asUser(alice) {
         if (tradeLen < 4 || inputAmount == 0) {
             return;
         }
@@ -504,23 +485,24 @@ contract MinimaRouterV1Test is ExtendedDSTest {
             });
 
         inputToken.approve(address(minimaRouter), inputAmount);
-        vm.expectRevert(bytes("MinimaRouterV1: Inner path and pairs length mismatch!"));
+        vm.expectRevert(
+            bytes("MinimaRouterV1: Inner path and pairs length mismatch!")
+        );
         minimaRouter.swapExactInputForOutput(payload);
     }
 
-    function testShouldFailOnRandomEthSend()
-        public
-        asUser(alice)
-    {
+    function testShouldFailOnRandomEthSend() public asUser(alice) {
         vm.deal(alice, 1 ether);
-        (bool sent, bytes memory data) = payable(address(minimaRouter)).call{value: 1 ether}("");
+        (bool sent, bytes memory data) = payable(address(minimaRouter)).call{
+            value: 1 ether
+        }("");
         assertEq(sent, false);
     }
 
-    function testRouteShouldFailOnTransferToCurrentPath(uint8 tradeLen, uint256 inputAmount)
-        public
-        asUser(alice)
-    {
+    function testRouteShouldFailOnTransferToCurrentPath(
+        uint8 tradeLen,
+        uint256 inputAmount
+    ) public asUser(alice) {
         if (tradeLen < 4 || inputAmount == 0) {
             return;
         }
@@ -589,14 +571,16 @@ contract MinimaRouterV1Test is ExtendedDSTest {
             });
 
         inputToken.approve(address(minimaRouter), inputAmount);
-        vm.expectRevert(bytes("MinimaRouterV1: Can not transfer to completed path!"));
+        vm.expectRevert(
+            bytes("MinimaRouterV1: Can not transfer to completed path!")
+        );
         minimaRouter.swapExactInputForOutput(payload);
     }
 
-    function testRouteShouldFailOnTransferToCompletedPath(uint8 tradeLen, uint256 inputAmount)
-        public
-        asUser(alice)
-    {
+    function testRouteShouldFailOnTransferToCompletedPath(
+        uint8 tradeLen,
+        uint256 inputAmount
+    ) public asUser(alice) {
         if (tradeLen < 4 || inputAmount == 0) {
             return;
         }
@@ -683,7 +667,9 @@ contract MinimaRouterV1Test is ExtendedDSTest {
             });
 
         inputToken.approve(address(minimaRouter), inputAmount);
-        vm.expectRevert(bytes("MinimaRouterV1: Can not transfer to completed path!"));
+        vm.expectRevert(
+            bytes("MinimaRouterV1: Can not transfer to completed path!")
+        );
         minimaRouter.swapExactInputForOutput(payload);
     }
 
@@ -794,13 +780,14 @@ contract MinimaRouterV1Test is ExtendedDSTest {
         assertEq(expectedSigner, address(0));
 
         vm.expectRevert("ECDSA: invalid signature");
-        uint256 partnerInfo = minimaRouterExternal.getPartnerIdFromSig__External(
-            partnerId,
-            deadline,
-            tokenIn,
-            tokenOut,
-            sig
-        );
+        uint256 partnerInfo = minimaRouterExternal
+            .getPartnerIdFromSig__External(
+                partnerId,
+                deadline,
+                tokenIn,
+                tokenOut,
+                sig
+            );
     }
 
     function testSetPartnerFee(uint256 feeNumerator, uint256 partnerId)
@@ -812,8 +799,10 @@ contract MinimaRouterV1Test is ExtendedDSTest {
         if (feeNumerator > minimaRouter.MAX_PARTNER_FEE()) {
             vm.expectRevert(bytes("MinimaRouterV1: Fee too high"));
             minimaRouter.setPartnerFee(partnerId, feeNumerator);
-        } else if (oldFee == feeNumerator){
-            vm.expectRevert(bytes("MinimaRouterV1: Old fee can not equal new fee!"));
+        } else if (oldFee == feeNumerator) {
+            vm.expectRevert(
+                bytes("MinimaRouterV1: Old fee can not equal new fee!")
+            );
             minimaRouter.setPartnerFee(partnerId, feeNumerator);
         } else {
             minimaRouter.setPartnerFee(partnerId, feeNumerator);

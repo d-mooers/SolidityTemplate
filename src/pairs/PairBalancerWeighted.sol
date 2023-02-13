@@ -1,7 +1,7 @@
 pragma solidity 0.8.18;
 
-import "@openzeppelin08/contracts/utils/math/SafeMath.sol";
-import "@openzeppelin08/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "../utils/WeightedMath.sol";
 import "../interfaces/balancerV2/IPairBalancerWeightedVault.sol";
 import "../interfaces/balancerV2/IPairBalancerBaseWeightedPool.sol";

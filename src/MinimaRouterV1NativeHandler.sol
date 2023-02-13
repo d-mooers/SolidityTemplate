@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.18;
 
-import "@openzeppelin08/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "./interfaces/ISwappaPairV1.sol";
 import {IMinimaRouterV1} from "./interfaces/IMinimaRouterV1.sol";
 import {IMinimaRouterV1NativeHandler} from "./interfaces/IMinimaRouterV1NativeHandler.sol";
@@ -11,7 +11,7 @@ contract MinimaRouterV1NativeHandler is IMinimaRouterV1NativeHandler {
     address public immutable minimaRouter;
     address public immutable wrapperContract;
 
-    uint256 UINT_MAX = (2**256)-1;
+    uint256 UINT_MAX = (2**256) - 1;
 
     constructor(address _minimaRouter, address _wrapperContract) public {
         minimaRouter = _minimaRouter;

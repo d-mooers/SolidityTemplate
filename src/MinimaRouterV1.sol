@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.18;
 
-import "@openzeppelin08/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin08/contracts/utils/cryptography/ECDSA.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "./interfaces/ISwappaPairV1.sol";
 import "./interfaces/IMinimaRouterV1.sol";
-import "@openzeppelin08/contracts/access/Ownable.sol";
-import "@openzeppelin08/contracts/utils/math/SafeMath.sol";
-import "@openzeppelin08/contracts/utils/Address.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
 
 contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
     using SafeMath for uint256;
@@ -49,21 +49,11 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
         uint256 newFee
     );
 
-    event AdminFeeRecovered(
-        address token,
-        address reciever,
-        uint256 amount
-    );
+    event AdminFeeRecovered(address token, address reciever, uint256 amount);
 
-    event AdminChanged(
-        address addr,
-        bool isAdmin
-    );
+    event AdminChanged(address addr, bool isAdmin);
 
-    event PartnerAdminChanged(
-        uint256 partnerId,
-        address addr
-    );
+    event PartnerAdminChanged(uint256 partnerId, address addr);
 
     modifier partnerAuthorized(uint256 partnerId) {
         require(
@@ -99,7 +89,9 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
 
         uint256 size;
         // solhint-disable-next-line no-inline-assembly
-        assembly { size := extcodesize(account) }
+        assembly {
+            size := extcodesize(account)
+        }
         return size > 0;
     }
 
@@ -110,8 +102,14 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
         public
         Ownable()
     {
-        require(admin != address(0), "MinimaRouterV1: Admin can not be 0 address!");
-        require(isContract(admin), "MinimaRouterV1: Minima must be deployed from contract!");
+        require(
+            admin != address(0),
+            "MinimaRouterV1: Admin can not be 0 address!"
+        );
+        require(
+            isContract(admin),
+            "MinimaRouterV1: Minima must be deployed from contract!"
+        );
         transferOwnership(admin);
 
         // Make the null tenant the admin wallet, with default fee numerator of 0
@@ -119,16 +117,19 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
 
         // Add the initial signers
         for (uint8 i = 0; i < initialSigners.length; i++) {
-            require(initialSigners[i] != address(0), "MinimaRouterV1: Initial signers can not be 0 address!");
+            require(
+                initialSigners[i] != address(0),
+                "MinimaRouterV1: Initial signers can not be 0 address!"
+            );
             adminSigner[initialSigners[i]] = true;
         }
     }
 
-    function renounceOwnership() public override onlyOwner{
+    function renounceOwnership() public override onlyOwner {
         revert("MinimaRouterV1: Ownership can't be renounced!");
     }
 
-    function transferOwnership(address newOwner) public override onlyOwner{
+    function transferOwnership(address newOwner) public override onlyOwner {
         partnerAdmin[0] = newOwner;
         super.transferOwnership(newOwner);
     }
@@ -137,7 +138,10 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
         external
         onlyAdmin
     {
-        require(reciever != address(0), "MinimaRouterV1: Reciever can not be 0 address!");
+        require(
+            reciever != address(0),
+            "MinimaRouterV1: Reciever can not be 0 address!"
+        );
         outputBalancesBefore[token] = 0;
 
         uint256 toClaim = IERC20(token).balanceOf(address(this));
@@ -176,7 +180,10 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
     }
 
     function setAdmin(address addr, bool isAdmin) external onlyOwner {
-        require(addr != address(0), "MinimaRouterV1: Admin can not be 0 address!");
+        require(
+            addr != address(0),
+            "MinimaRouterV1: Admin can not be 0 address!"
+        );
         adminSigner[addr] = isAdmin;
         emit AdminChanged(addr, isAdmin);
     }
@@ -185,7 +192,10 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
         external
         partnerAuthorized(partnerId)
     {
-        require(admin != address(0), "MinimaRouterV1: Admin can not be 0 address!");
+        require(
+            admin != address(0),
+            "MinimaRouterV1: Admin can not be 0 address!"
+        );
         partnerAdmin[partnerId] = admin;
         emit PartnerAdminChanged(partnerId, admin);
     }
@@ -194,9 +204,15 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
         external
         partnerAuthorized(partnerId)
     {
-        require(feeNumerator <= MAX_PARTNER_FEE, "MinimaRouterV1: Fee too high");
-        uint256 oldFee = partnerFeesNumerator[partnerId];    
-        require(oldFee != feeNumerator, "MinimaRouterV1: Old fee can not equal new fee!");
+        require(
+            feeNumerator <= MAX_PARTNER_FEE,
+            "MinimaRouterV1: Fee too high"
+        );
+        uint256 oldFee = partnerFeesNumerator[partnerId];
+        require(
+            oldFee != feeNumerator,
+            "MinimaRouterV1: Old fee can not equal new fee!"
+        );
         partnerFeesNumerator[partnerId] = feeNumerator;
         emit FeeChanged(partnerId, msg.sender, false, oldFee, feeNumerator);
     }
@@ -239,7 +255,7 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
         bytes32 message = prefixed(
             keccak256(abi.encodePacked(partnerId, deadline, tokenIn, tokenOut))
         );
-       
+
         address signer = recoverSigner(message, sig);
 
         // QSP-1: Check for null return from ecrecover and for admin rights of signer
@@ -256,7 +272,7 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
         uint256 inputAmount
     ) external view override returns (uint256 outputAmount) {
         outputAmount = inputAmount;
-        for (uint256 i=0; i < pairs.length; i++) {
+        for (uint256 i = 0; i < pairs.length; i++) {
             outputAmount = ISwappaPairV1(pairs[i]).getOutputAmount(
                 path[i],
                 path[i + 1],
@@ -275,9 +291,9 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
         address to,
         uint256 partnerId
     ) internal returns (uint256) {
-        uint256 partnerFee = outputAmount.mul(partnerFeesNumerator[partnerId]).div(
-            FEE_DENOMINATOR
-        );
+        uint256 partnerFee = outputAmount
+            .mul(partnerFeesNumerator[partnerId])
+            .div(FEE_DENOMINATOR);
         outputAmount = outputAmount.sub(partnerFee);
         outputAmount = outputAmount < expectedOutput
             ? outputAmount
@@ -327,7 +343,7 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
         }
 
         uint256[] memory transferAmounts = new uint256[](divisors.length);
-        for (uint256 k=0; k < divisors.length; k++) {
+        for (uint256 k = 0; k < divisors.length; k++) {
             uint8 weight = divisors[k].divisor;
             require(weight <= 100, "MinimaRouter: Divisor too high");
             require(weight > 0, "MinimaRouter: Divisor too low");
@@ -338,9 +354,10 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
 
             weightSumExpected = weightSumExpected.sub(weight);
 
-            uint256 swapResult = SafeMath.sub(IERC20(divisors[k].token).balanceOf(
-                address(this)
-            ), outputBalancesBefore[divisors[k].token]);
+            uint256 swapResult = SafeMath.sub(
+                IERC20(divisors[k].token).balanceOf(address(this)),
+                outputBalancesBefore[divisors[k].token]
+            );
 
             uint256 transferAmount = swapResult.mul(weight).div(
                 DIVISOR_DENOMINATOR
@@ -359,7 +376,7 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
         returns (uint256[] memory)
     {
         require(
-            details.deadline >= block.timestamp, 
+            details.deadline >= block.timestamp,
             "MinimaRouterV1: Expired!"
         );
         require(
@@ -394,8 +411,14 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
         bool[] memory completedPaths = new bool[](details.path.length);
 
         for (uint256 i = 0; i < details.path.length; i++) {
-            require(details.pairs[i].length > 0, "MinimaRouterV1: Inner pairs length can not be 0!");
-            require(details.pairs[i].length == details.path[i].length - 1, "MinimaRouterV1: Inner path and pairs length mismatch!");
+            require(
+                details.pairs[i].length > 0,
+                "MinimaRouterV1: Inner pairs length can not be 0!"
+            );
+            require(
+                details.pairs[i].length == details.path[i].length - 1,
+                "MinimaRouterV1: Inner path and pairs length mismatch!"
+            );
             //Transfer initial amounts
             if (details.inputAmounts[i] > 0) {
                 require(
@@ -408,7 +431,7 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
                 );
             }
 
-            for (uint256 j=0; j < details.pairs[i].length; j++) {
+            for (uint256 j = 0; j < details.pairs[i].length; j++) {
                 (address pairInput, address pairOutput) = (
                     details.path[i][j],
                     details.path[i][j + 1]
@@ -430,11 +453,14 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
                     details.divisors[i]
                 );
 
-                for (uint256 k=0; k < transferAmounts.length; k++) {
+                for (uint256 k = 0; k < transferAmounts.length; k++) {
                     uint8 toIdx = details.divisors[i][k].toIdx;
-                    require(completedPaths[toIdx] == false && toIdx != i, "MinimaRouterV1: Can not transfer to completed path!");
+                    require(
+                        completedPaths[toIdx] == false && toIdx != i,
+                        "MinimaRouterV1: Can not transfer to completed path!"
+                    );
 
-                    if(transferAmounts[k] > 0){
+                    if (transferAmounts[k] > 0) {
                         require(
                             IERC20(details.divisors[i][k].token).transfer(
                                 details.pairs[toIdx][0],
@@ -448,8 +474,10 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
             completedPaths[i] = true;
         }
 
-        uint256 tradeOutput = SafeMath.sub(IERC20(output).balanceOf(address(this)),
-            outputBalancesBefore[output]);
+        uint256 tradeOutput = SafeMath.sub(
+            IERC20(output).balanceOf(address(this)),
+            outputBalancesBefore[output]
+        );
         uint256 partnerId = getPartnerIdFromSig(
             details.partner,
             details.deadline,
