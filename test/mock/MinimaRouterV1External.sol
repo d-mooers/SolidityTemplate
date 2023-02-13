@@ -1,5 +1,4 @@
-pragma solidity 0.6.8;
-pragma experimental ABIEncoderV2;
+pragma solidity 0.8.18;
 
 import {MinimaRouterV1} from "../../src/MinimaRouterV1.sol";
 

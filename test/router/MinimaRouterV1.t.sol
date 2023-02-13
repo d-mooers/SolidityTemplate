@@ -1,10 +1,9 @@
-pragma solidity 0.6.8;
-pragma experimental ABIEncoderV2;
+pragma solidity 0.8.18;
 
 import {MockErc20} from "../mock/MockErc20.sol";
 import {MockFailingErc20} from "../mock/MockFailingErc20.sol";
 
-import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
+import {Strings} from "@openzeppelin08/contracts/utils/Strings.sol";
 
 import {Test} from "forge-std/Test.sol";
 
@@ -514,7 +513,7 @@ contract MinimaRouterV1Test is ExtendedDSTest {
         asUser(alice)
     {
         vm.deal(alice, 1 ether);
-        (bool sent, bytes memory _) = payable(address(minimaRouter)).call{value: 1 ether}("");
+        (bool sent, bytes memory data) = payable(address(minimaRouter)).call{value: 1 ether}("");
         assertEq(sent, false);
     }
 

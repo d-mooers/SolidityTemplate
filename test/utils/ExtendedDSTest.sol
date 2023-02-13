@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0
-pragma solidity 0.6.8;
+pragma solidity >=0.4.22 <0.9.0;
 
 import "ds-test/test.sol";
 import {console} from "forge-std/console.sol";

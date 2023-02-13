@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.6.8;
-pragma experimental ABIEncoderV2;
+pragma solidity 0.8.18;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "./interfaces/ISwappaPairV1.sol";
+import "@openzeppelin08/contracts/token/ERC20/ERC20.sol";
+import "./interfaces/ISwappaPairV18.sol";
 import {IMinimaRouterV1} from "./interfaces/IMinimaRouterV1.sol";
 import {IMinimaRouterV1NativeHandler} from "./interfaces/IMinimaRouterV1NativeHandler.sol";
 import {INative} from "./interfaces/INative.sol";
@@ -12,13 +11,15 @@ contract MinimaRouterV1NativeHandler is IMinimaRouterV1NativeHandler {
     address public immutable minimaRouter;
     address public immutable wrapperContract;
 
+    uint256 UINT_MAX = (2**256)-1;
+
     constructor(address _minimaRouter, address _wrapperContract) public {
         minimaRouter = _minimaRouter;
         wrapperContract = _wrapperContract;
 
         // Infinite approve minima contract
         require(
-            ERC20(_wrapperContract).approve(_minimaRouter, uint256(-1)),
+            ERC20(_wrapperContract).approve(_minimaRouter, UINT_MAX),
             "approve failed"
         );
     }

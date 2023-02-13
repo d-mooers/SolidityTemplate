@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.6.8;
-pragma experimental ABIEncoderV2;
+pragma solidity 0.8.18;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "./interfaces/ISwappaPairV1.sol";
+import "@openzeppelin08/contracts/token/ERC20/IERC20.sol";
+import "./interfaces/ISwappaPairV18.sol";
 import "./interfaces/IMinimaRouterV1.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/math/SafeMath.sol";
-import "@openzeppelin/contracts/utils/Address.sol";
+import "@openzeppelin08/contracts/access/Ownable.sol";
+import "@openzeppelin08/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin08/contracts/utils/Address.sol";
 
 contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
     using SafeMath for uint256;
