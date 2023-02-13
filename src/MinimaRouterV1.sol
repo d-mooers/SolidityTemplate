@@ -2,6 +2,7 @@
 pragma solidity 0.8.18;
 
 import "@openzeppelin08/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin08/contracts/utils/cryptography/ECDSA.sol";
 import "./interfaces/ISwappaPairV1.sol";
 import "./interfaces/IMinimaRouterV1.sol";
 import "@openzeppelin08/contracts/access/Ownable.sol";
@@ -219,7 +220,7 @@ contract MinimaRouterV1 is IMinimaRouterV1, Ownable {
 
         (v, r, s) = splitSignature(sig);
 
-        return ecrecover(message, v, r, s);
+        return ECDSA.recover(message, v, r, s);
     }
 
     function getPartnerFee(uint256 partnerId) external view returns (uint256) {

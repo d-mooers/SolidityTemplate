@@ -793,6 +793,7 @@ contract MinimaRouterV1Test is ExtendedDSTest {
 
         assertEq(expectedSigner, address(0));
 
+        vm.expectRevert("ECDSA: invalid signature");
         uint256 partnerInfo = minimaRouterExternal.getPartnerIdFromSig__External(
             partnerId,
             deadline,
@@ -800,8 +801,6 @@ contract MinimaRouterV1Test is ExtendedDSTest {
             tokenOut,
             sig
         );
-
-        assertEq(partnerInfo, 0);
     }
 
     function testSetPartnerFee(uint256 feeNumerator, uint256 partnerId)
